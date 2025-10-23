@@ -145,7 +145,7 @@ def main():
     model_path_adv = os.path.join(eval_adv_log_path, 'model')
     os.makedirs(model_path_adv, exist_ok=True)
     checkpoint_callback_adv = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
-
+    checkpoint_callback_adv_last = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
     # whether padding
     # rollout_buffer_map = {
     #     (True, True): DecouplePaddingRolloutBuffer,
@@ -227,7 +227,9 @@ def main():
             env_def.close()
 
         else:
-            run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.addition_msg}"
+            if args.action_diff:
+                args.addition_msg = "action_diff"
+            run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}"
             run = swanlab.init(project="RARL", name=run_name, config=args)
             swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
 
@@ -237,13 +239,14 @@ def main():
             model_def_first.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                                   callback=checkpoint_callback_def)
 
-            env_def_first.close()
-
             model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
 
             # 2025-10-04 wq 需要另外的模型来加载上次训练好的模型
             model_def = create_model_def(args, env_def, replay_buffer_class_def, device, best_model_path_def, False)
             model_def.actor.load_state_dict(model_def_first.actor.state_dict())
+
+            env_def_first.close()
+            del model_def_first
 
             for i in range(args.loop_nums):
                 model_old_def.actor.load_state_dict(model_def.actor.state_dict())
@@ -274,9 +277,10 @@ def main():
                 model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                                 callback=[checkpoint_callback_def, swan_cb, eval_callback_def], trained_agent=model_old_def,
                                 trained_adv=model_old_adv,  reset_num_timesteps=False, log_interval = args.print_interval)
+            model_old_def.actor.load_state_dict(model_def.actor.state_dict())
 
             model_adv_last = create_model_adv(args, env_adv_last, rollout_buffer_class_adv, device, best_model_path_adv)
-            eval_callback_adv = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_def,
+            eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
                                                        attack_eps=args.attack_eps,
                                                        best_model_save_path=eval_best_model_path_adv,
                                                        n_eval_episodes=20,
@@ -284,8 +288,8 @@ def main():
                                                        unlimited_attack=args.unlimited_attack,
                                                        attack_method=args.attack_method)
             model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
-                            callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv],
-                            trained_def=model_def, reset_num_timesteps=False, log_interval=args.print_interval)
+                            callback=[checkpoint_callback_adv_last, swan_cb, eval_callback_adv_last],
+                            trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
 
             # Save the agent
             eval_env_def.close()
@@ -294,9 +298,10 @@ def main():
 
             model_adv_last.save(os.path.join(eval_adv_log_path, "lunar"))
             del model_adv_last
+            env_adv_last.close()
+
             del model_adv
             env_adv.close()
-            env_adv_last.close()
 
             model_def.save(os.path.join(eval_def_log_path, "lunar"))
             del model_def
@@ -364,8 +369,6 @@ def main():
         eval_env_def.close()
         eval_env_adv.close()
         eval_env_adv_last.close()
-
-
 
         model_adv_last.save(os.path.join(eval_adv_log_path, "lunar"))
         del model_adv_last
