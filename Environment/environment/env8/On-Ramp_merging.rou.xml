@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-01-02 23:28:35 by Eclipse SUMO netedit Version 1.21.0
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id= "Auto" accel="7.60000" decel="7.600000" sigma="0.000" maxSpeed = "15.0000" length="5.000000" color="1,0,0" vClass="passenger" minGap="1.0" tau="1.0" laneChangeModel="LC2013"/>
+    <vType id= "Car" accel="1.0000000" decel="1.6000000" sigma="0.001" maxSpeed = "13.00" length="5.000000" color="0,1,0" vClass="passenger" minGap="1.0" tau="1.0" laneChangeModel="LC2013" lcOpposite="1" lcCooperative="0.1" lcSpeedGain="0.01" lcStrategic="100000" lcKeepRight="100000"/>
+    <vType id= "Car1" accel="1.000000" decel="2.00000" sigma="0.100" maxSpeed = "12.00" length="5.000000" color="0,1,1" vClass="passenger" minGap="1.0" tau="1.0" laneChangeModel="LC2013" lcOpposite="1" lcCooperative="0.1" lcSpeedGain="0.01" lcStrategic="100000" lcKeepRight="100000"/>
+    <vType id= "Car2" accel="2.000000" decel="3.00000" sigma="0.200" maxSpeed = "12.00" length="5.000000" color="1,1,1" vClass="passenger" minGap="1.0" tau="1.0" laneChangeModel="LC2013" lcOpposite="1" lcCooperative="0.1" lcSpeedGain="0.03" lcStrategic="100000" lcKeepRight="100000"/>
+    <vType id= "Car3" accel="1.600000" decel="2.0000" sigma="0.300" maxSpeed = "10.00" length="5.000000" color="1,0,1" vClass="passenger" minGap="1.0" tau="1.0" laneChangeModel="LC2013" lcOpposite="1" lcCooperative="0.1" lcSpeedGain="0.05" lcStrategic="100000" lcKeepRight="100000"/>
+
+    <!-- Routes -->
+    <route id="r_0" edges="E1 E2"/>
+    <route id="r_1" edges="E3 E2"/>
+
+    <flow id="f_0" begin="0.00" from="E1" to="E2" end="3600.00" probability="0.500" departLane="0"  route="r_0" type="Car"/>
+<!--    <flow id="f_1" begin="0.00" from="E1" to="E2" end="3600.00" probability="0.500" departLane="0"  route="r_0" type="Car1"/>-->
+    <flow id="f_2" begin="0.00" from="E1" to="E2" end="3600.00" probability="0.500" departLane="1"  route="r_0" type="Car2"/>
+    <flow id="f_3" begin="0.00" from="E1" to="E2" end="3600.00" probability="0.500" departLane="2"  route="r_0" type="Car3"/>
+
+    <vehicle id="Auto" color="1,0,0" depart="400" type="Auto" departPos="83.04" route="r_1"/>
+
+</routes>
