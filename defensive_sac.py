@@ -27,6 +27,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.attack_eps = custom_args.attack_eps
         self.trained_adv = None
         self.trained_agent = None
+        self.action_diff = custom_args.action_diff
 
         # 2025-09-23 wq 加载敌手和防御者
         # if self.best_model:
@@ -203,37 +204,33 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
             #         state_eps = state_eps.detach().cpu().numpy()
 
             # 2025-10-22 wq 这里修改loss，如果扰动了，就添加一个动作约束，是扰动前的动作和扰动后的动作
-            with th.no_grad():
-                actions_clean_np, _states = self.trained_agent.predict(obs.cpu(), deterministic=True)
-            actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
-
-            per_elem_sq = (actions_clean - actions_pi) ** 2
-            per_sample_mse = per_elem_sq.mean(dim=1)
-
-            # print("DEBUG per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
-
-            mask = obs_is_per.to(device=per_sample_mse.device)
-            if mask.dtype.is_floating_point:
-                mask = mask > 0.5
-            else:
-                mask = mask.bool()
-            mask = mask.view(-1)
-
-            # apply mask: false -> zero loss, true -> keep per-sample mse
-            mask_float = mask.to(dtype=per_sample_mse.dtype)
-            masked_per_sample = per_sample_mse * mask_float  # (B,)
-
-            action_loss_masked = masked_per_sample.mean()
-
 
             q_values_pi = th.cat(self.critic(obs_used, actions_pi), dim=1)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
+            actor_loss_policy = (ent_coef * log_prob - min_qf_pi).mean()
 
 
+            if self.action_diff:
+                with th.no_grad():
+                    actions_clean_np, _states = self.trained_agent.predict(obs.cpu(), deterministic=True)
+                actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
 
+                per_elem_sq = (actions_clean - actions_pi) ** 2
+                per_sample_mse = per_elem_sq.mean(dim=1)
+                mask = obs_is_per.to(device=per_sample_mse.device)
+                if mask.dtype.is_floating_point:
+                    mask = mask > 0.5
+                else:
+                    mask = mask.bool()
+                mask = mask.view(-1)
 
-            actor_loss_policy   = (ent_coef * log_prob - min_qf_pi).mean()
-            actor_loss = actor_loss_policy +  action_loss_masked
+                # apply mask: false -> zero loss, true -> keep per-sample mse
+                mask_float = mask.to(dtype=per_sample_mse.dtype)
+                masked_per_sample = per_sample_mse * mask_float  # (B,)
+                action_loss_masked = masked_per_sample.mean()
+                actor_loss = actor_loss_policy +  action_loss_masked
+            else:
+                actor_loss = actor_loss_policy
 
             # print("DEBUG action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
             # print("DEBUG min_qf_pi: ", min_qf_pi, " shape: ", min_qf_pi.shape)
