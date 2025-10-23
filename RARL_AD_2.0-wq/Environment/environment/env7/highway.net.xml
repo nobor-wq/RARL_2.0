@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<net version="1.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+    <!-- 网络位置和边界定义 -->
+    <location netOffset="0.00,0.00" convBoundary="-200.00,-200.00,2200.00,400.00" origBoundary="-10000000000.00,-10000000000.00,10000000000.00,10000000000.00" projParameter="!"/>
+    
+    <!-- 高速公路直线路段 E18: J16 到 J20 -->
+    <edge id="E18" from="J16" to="J20" priority="1">
+        <lane id="E18_0" index="0" speed="30.00" length="2200.00" acceleration="1" shape="704.00,88.80 2200.00,88.80"/>
+        <lane id="E18_1" index="1" speed="30.00" length="2200.00" acceleration="1" shape="704.00,92.00 2200.00,92.00"/>
+        <lane id="E18_2" index="2" speed="30.00" length="2200.00" acceleration="1" shape="704.00,95.20 2200.00,95.20"/>
+    </edge>
+
+    <!-- 交叉口 J16 -->
+    <junction id="J16" type="unregulated" x="700.00" y="100.00" incLanes="E18_0 E18_1 E18_2" intLanes="E18_0 E18_1 E18_2" shape="704.00,100.00 704.00,87.20 688.84,87.20 688.84,100.00"/>
+
+    <!-- 交叉口 J20 -->
+    <junction id="J20" type="dead_end" x="2200.00" y="100.00" incLanes="E18_0 E18_1 E18_2" intLanes="" shape="2200.00,87.20 2200.00,100.00 2200.00,87.20"/>
+
+</net>
