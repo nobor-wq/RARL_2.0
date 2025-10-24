@@ -10699,3 +10699,2750 @@ Success rate: 49.60
 Success attack rate: 42.33
 Reward per attack: 0.42 +/- 0.31
 --------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 1
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.31 +/- 0.46
+Mean steps: 25.46 +/- 6.85
+Mean speed: 13.43 +/- 3.47
+Mean attack times: nan +/- nan
+Collision rate: 30.80
+Success rate: 69.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 2
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.48 +/- 0.50
+Mean steps: 24.69 +/- 7.03
+Mean speed: 13.52 +/- 3.55
+Mean attack times: nan +/- nan
+Collision rate: 48.40
+Success rate: 51.60
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 3
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.27 +/- 0.44
+Mean steps: 26.04 +/- 6.51
+Mean speed: 13.18 +/- 3.75
+Mean attack times: nan +/- nan
+Collision rate: 27.20
+Success rate: 72.80
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 4
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.37 +/- 0.48
+Mean steps: 24.56 +/- 7.19
+Mean speed: 12.89 +/- 4.05
+Mean attack times: nan +/- nan
+Collision rate: 36.60
+Success rate: 63.40
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 5
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.38 +/- 0.49
+Mean steps: 23.85 +/- 8.11
+Mean speed: 13.05 +/- 4.02
+Mean attack times: nan +/- nan
+Collision rate: 38.00
+Success rate: 62.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 6
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.39 +/- 0.49
+Mean steps: 23.91 +/- 7.75
+Mean speed: 13.08 +/- 3.79
+Mean attack times: nan +/- nan
+Collision rate: 39.00
+Success rate: 61.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 7
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.36 +/- 0.48
+Mean steps: 24.59 +/- 7.22
+Mean speed: 13.20 +/- 3.84
+Mean attack times: nan +/- nan
+Collision rate: 36.00
+Success rate: 64.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 8
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.32 +/- 0.47
+Mean steps: 25.30 +/- 6.91
+Mean speed: 13.05 +/- 4.05
+Mean attack times: nan +/- nan
+Collision rate: 31.80
+Success rate: 68.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 9
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.35 +/- 0.48
+Mean steps: 24.75 +/- 7.20
+Mean speed: 12.92 +/- 4.04
+Mean attack times: nan +/- nan
+Collision rate: 34.80
+Success rate: 65.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 10
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 005_1
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.29 +/- 0.45
+Mean steps: 25.72 +/- 6.77
+Mean speed: 13.08 +/- 3.67
+Mean attack times: nan +/- nan
+Collision rate: 28.60
+Success rate: 71.40
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 1
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.37 +/- 0.48
+Mean steps: 24.47 +/- 7.22
+Mean speed: 13.07 +/- 3.96
+Mean attack times: nan +/- nan
+Collision rate: 37.00
+Success rate: 63.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 2
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.36 +/- 0.48
+Mean steps: 24.17 +/- 7.98
+Mean speed: 13.01 +/- 3.72
+Mean attack times: nan +/- nan
+Collision rate: 36.40
+Success rate: 63.60
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 3
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.38 +/- 0.48
+Mean steps: 24.37 +/- 7.24
+Mean speed: 13.04 +/- 4.07
+Mean attack times: nan +/- nan
+Collision rate: 37.80
+Success rate: 62.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 4
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.38 +/- 0.48
+Mean steps: 24.61 +/- 7.15
+Mean speed: 13.32 +/- 3.81
+Mean attack times: nan +/- nan
+Collision rate: 37.60
+Success rate: 62.40
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 5
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.37 +/- 0.48
+Mean steps: 24.98 +/- 7.03
+Mean speed: 13.30 +/- 3.87
+Mean attack times: nan +/- nan
+Collision rate: 37.40
+Success rate: 62.60
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 6
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.35 +/- 0.48
+Mean steps: 24.71 +/- 7.16
+Mean speed: 13.15 +/- 3.84
+Mean attack times: nan +/- nan
+Collision rate: 35.40
+Success rate: 64.60
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 7
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.30 +/- 0.46
+Mean steps: 25.48 +/- 6.90
+Mean speed: 12.87 +/- 4.24
+Mean attack times: nan +/- nan
+Collision rate: 30.00
+Success rate: 70.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 8
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.37 +/- 0.48
+Mean steps: 24.43 +/- 7.27
+Mean speed: 13.28 +/- 3.63
+Mean attack times: nan +/- nan
+Collision rate: 37.00
+Success rate: 63.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 9
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.36 +/- 0.48
+Mean steps: 24.47 +/- 7.56
+Mean speed: 13.29 +/- 3.62
+Mean attack times: nan +/- nan
+Collision rate: 35.80
+Success rate: 64.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 0
+seed: 10
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 01_1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.35 +/- 0.48
+Mean steps: 24.43 +/- 7.87
+Mean speed: 13.38 +/- 3.63
+Mean attack times: nan +/- nan
+Collision rate: 34.80
+Success rate: 65.20
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 1
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.54 +/- 0.50
+Mean steps: 22.14 +/- 7.33
+Mean speed: 12.47 +/- 4.30
+Mean attack times: 3.93 +/- 2.01
+Collision rate: 53.80
+Success rate: 46.20
+Success attack rate: 51.57
+Reward per attack: 0.51 +/- 0.10
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 2
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.47 +/- 0.50
+Mean steps: 23.71 +/- 6.73
+Mean speed: 11.96 +/- 4.99
+Mean attack times: 4.57 +/- 1.82
+Collision rate: 47.00
+Success rate: 53.00
+Success attack rate: 44.21
+Reward per attack: 0.45 +/- 0.24
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 3
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.38 +/- 0.48
+Mean steps: 25.31 +/- 6.15
+Mean speed: 11.08 +/- 5.47
+Mean attack times: 5.28 +/- 1.25
+Collision rate: 37.60
+Success rate: 62.00
+Success attack rate: 35.93
+Reward per attack: 0.28 +/- 0.09
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 4
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.51 +/- 0.50
+Mean steps: 22.35 +/- 7.50
+Mean speed: 13.13 +/- 3.92
+Mean attack times: 3.45 +/- 2.50
+Collision rate: 51.00
+Success rate: 49.00
+Success attack rate: 51.00
+Reward per attack: 1.00 +/- 0.00
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 5
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.34 +/- 0.47
+Mean steps: 26.00 +/- 5.88
+Mean speed: 10.26 +/- 5.97
+Mean attack times: 5.20 +/- 1.68
+Collision rate: 34.00
+Success rate: 65.40
+Success attack rate: 34.00
+Reward per attack: 0.47 +/- 0.36
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 6
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.75 +/- 0.43
+Mean steps: 20.23 +/- 5.79
+Mean speed: 10.87 +/- 5.43
+Mean attack times: 3.67 +/- 1.95
+Collision rate: 75.20
+Success rate: 23.80
+Success attack rate: 75.20
+Reward per attack: 0.51 +/- 0.33
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 7
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.50 +/- 0.50
+Mean steps: 22.38 +/- 7.60
+Mean speed: 13.01 +/- 3.98
+Mean attack times: 3.87 +/- 2.33
+Collision rate: 50.20
+Success rate: 49.80
+Success attack rate: 46.22
+Reward per attack: 0.81 +/- 0.25
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 8
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.32 +/- 0.46
+Mean steps: 26.12 +/- 5.96
+Mean speed: 10.49 +/- 5.84
+Mean attack times: 5.39 +/- 1.38
+Collision rate: 31.60
+Success rate: 68.40
+Success attack rate: 31.60
+Reward per attack: 0.34 +/- 0.25
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 9
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.67 +/- 0.47
+Mean steps: 21.66 +/- 6.07
+Mean speed: 11.14 +/- 5.57
+Mean attack times: 4.23 +/- 1.88
+Collision rate: 66.60
+Success rate: 33.40
+Success attack rate: 66.60
+Reward per attack: 0.43 +/- 0.29
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 10
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.34 +/- 0.47
+Mean steps: 25.03 +/- 6.98
+Mean speed: 9.90 +/- 5.86
+Mean attack times: 5.21 +/- 1.31
+Collision rate: 33.80
+Success rate: 66.20
+Success attack rate: 33.80
+Reward per attack: 0.33 +/- 0.18
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 1
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.54 +/- 0.50
+Mean steps: 21.26 +/- 8.38
+Mean speed: 12.51 +/- 4.05
+Mean attack times: 4.20 +/- 2.06
+Collision rate: 53.80
+Success rate: 46.20
+Success attack rate: 44.07
+Reward per attack: 0.57 +/- 0.20
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 2
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.40 +/- 0.49
+Mean steps: 24.34 +/- 6.97
+Mean speed: 12.59 +/- 3.85
+Mean attack times: 4.72 +/- 1.62
+Collision rate: 39.80
+Success rate: 60.20
+Success attack rate: 39.80
+Reward per attack: 0.38 +/- 0.08
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 3
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.67 +/- 0.47
+Mean steps: 20.30 +/- 6.93
+Mean speed: 12.51 +/- 4.31
+Mean attack times: 3.11 +/- 2.07
+Collision rate: 67.40
+Success rate: 32.60
+Success attack rate: 67.40
+Reward per attack: 0.67 +/- 0.25
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 4
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.54 +/- 0.50
+Mean steps: 20.24 +/- 10.31
+Mean speed: 10.05 +/- 5.88
+Mean attack times: 4.78 +/- 1.95
+Collision rate: 54.40
+Success rate: 45.60
+Success attack rate: 39.20
+Reward per attack: 0.55 +/- 0.34
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 5
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.83 +/- 0.37
+Mean steps: 18.21 +/- 5.46
+Mean speed: 13.09 +/- 4.04
+Mean attack times: 3.27 +/- 1.61
+Collision rate: 83.20
+Success rate: 16.80
+Success attack rate: 83.20
+Reward per attack: 0.42 +/- 0.12
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 6
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.46 +/- 0.50
+Mean steps: 23.17 +/- 7.47
+Mean speed: 9.90 +/- 6.49
+Mean attack times: 3.93 +/- 2.28
+Collision rate: 45.60
+Success rate: 45.40
+Success attack rate: 45.60
+Reward per attack: 0.77 +/- 0.25
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 7
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.16 +/- 0.37
+Mean steps: 25.54 +/- 10.15
+Mean speed: 3.86 +/- 6.05
+Mean attack times: 5.43 +/- 1.27
+Collision rate: 16.20
+Success rate: 0.00
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 8
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.60 +/- 0.49
+Mean steps: 21.36 +/- 7.13
+Mean speed: 12.75 +/- 4.05
+Mean attack times: 4.03 +/- 1.73
+Collision rate: 59.60
+Success rate: 40.40
+Success attack rate: 59.60
+Reward per attack: 0.41 +/- 0.15
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 9
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.49 +/- 0.50
+Mean steps: 23.79 +/- 6.59
+Mean speed: 10.73 +/- 5.36
+Mean attack times: 4.43 +/- 2.04
+Collision rate: 49.20
+Success rate: 50.80
+Success attack rate: 49.20
+Reward per attack: 0.53 +/- 0.31
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: PPO
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 6
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 10
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.1
+attack_eps: 0.1
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v168_20250813_2342_2_57_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.39 +/- 0.49
+Mean steps: 24.12 +/- 7.31
+Mean speed: 11.68 +/- 5.47
+Mean attack times: 4.32 +/- 2.00
+Collision rate: 39.40
+Success rate: 53.80
+Success attack rate: 42.27
+Reward per attack: 0.52 +/- 0.15
+--------------------------------------------------
+Parameters:
+env_name: TrafficEnv3-v0
+addition_msg: 
+algo: SAC
+algo_adv: DARRL
+path_def: ./logs/eval_def/
+path_adv: ./logs/eval_adv/
+adv_steps: 4
+train_step: 500
+loop_nums: 30
+T_horizon: 30
+print_interval: 10
+speed_range: 15.0
+max_a: 7.6
+state_dim: 26
+action_dim: 1
+best_model: False
+eval_best_model: False
+eval: True
+use_cuda: True
+cuda_number: 1
+seed: 1
+save_freq: 100000
+n_steps: 128
+lr: 0.001
+batch_size: 64
+n_epochs: 15
+ent_coef: 0
+swanlab: False
+fni_model_path: 
+attack: True
+attack_method: fgsm
+train_eps: 0.05
+attack_eps: 0.05
+attack_iteration: 50
+step_size: 0.0075
+padding: False
+clipping: False
+decouple: False
+v_action_obs_flag: False
+remain_attack_time_flag: False
+unlimited_attack: False
+use_gui: False
+buf_reset: False
+base: False
+to_gif: False
+render_mode: None
+duration: 200
+num_envs: 1
+last_agent: False
+adv_model_path: 
+use_base_model: False
+base_cost: 0.02
+adv_test: False
+adv_algo_name: attacker_v124_20250813_2014_3_5_005.pth
+action_diff: False
+
+Results:
+Mean reward: 0.81 +/- 0.40
+Mean steps: 21.68 +/- 4.46
+Mean speed: 11.62 +/- 4.93
+Mean attack times: nan +/- nan
+Collision rate: 80.60
+Success rate: 19.40
+Success attack rate: 0.00
+Reward per attack: nan +/- nan
+--------------------------------------------------

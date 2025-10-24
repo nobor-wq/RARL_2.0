@@ -48,8 +48,8 @@ def get_config():
     # Attack parameters
     parser.add_argument('--attack', action='store_true', help='whether to change the env for attack')
     parser.add_argument('--attack_method', default="fgsm", help='which attack method to be applied')
+    parser.add_argument('--train_eps', default="005_1", help='epsilon-ball around init state')
     parser.add_argument('--attack_eps', type=float, default=0.01, help='epsilon-ball around init state')
-    parser.add_argument('--train_eps', type=float, default=0.01, help='epsilon-ball around init state')
     parser.add_argument('--attack_iteration', default=50, help='iterations for attack method')
     parser.add_argument('--step_size', default=0.0075, help='step size for fgsm')
 

@@ -69,7 +69,7 @@ if args.attack:
 if args.base:#str(args.seed)
     defense_model_path = "./logs/eval_def/" + os.path.join("base", args.algo, args.env_name, args.addition_msg, "1")
 else:#str(args.train_eps)
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg, "01_def", str(args.seed))
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg, str(args.train_eps), str(args.seed))
 
 # defense_model_path = os.path.join(args.path, args.env_name, args.algo)
 if args.best_model:
