@@ -184,166 +184,88 @@ def main():
     eval_env_def = DummyVecEnv([make_env(args.seed + 1000, 0, False)])
     eval_env_adv = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
     eval_env_adv_last = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
-
-    # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
-
-    model_old_def = SAC("MlpPolicy", env_def, verbose=1, learning_rate=args.lr, batch_size=args.batch_size, device=device)
-    model_old_adv = PPO("MlpPolicy", env_adv, verbose=1, learning_rate=args.lr, n_epochs=args.n_epochs, batch_size=args.batch_size, device=device, n_steps=args.n_steps)
-
-
+    # 2025-10-26 wq 统一的回调函数列表初始化
+    callbacks_common = []
     if args.swanlab:
-        if args.adv_test:
-            run_name = f"{args.attack_method}-{args.algo}-{args.seed}-only_attacker-{args.attack_eps}"
-            run = swanlab.init(project="RARL", name=run_name, config=args)
-            swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
-
-            model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
-
-            # 2025-10-16 wq 测试
-            defense_base_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, str(args.attack_eps), str(args.seed),  "lunar")
-            model_def = SAC.load(defense_base_model_path, device=device)
-
-
-            eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_def,
-                                                       attack_eps=args.attack_eps,
-                                                       best_model_save_path=eval_best_model_path_adv,
-                                                       n_eval_episodes=20,
-                                                       eval_freq=args.n_steps * 10,
-                                                       unlimited_attack=args.unlimited_attack,
-                                                       attack_method=args.attack_method)
-
-            model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                            callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv],
-                            trained_def=model_def, reset_num_timesteps=False, log_interval=args.print_interval)
-
-            eval_env_def.close()
-            eval_env_adv.close()
-
-            model_adv.save(os.path.join(eval_adv_log_path, "lunar"))
-            del model_adv
-            env_adv.close()
-
-            del model_def
-            env_def.close()
-
-        else:
-            if args.action_diff:
+        if args.action_diff:
+            if args.use_expert:
+                args.addition_msg = "action_diff_expert"
+            else:
                 args.addition_msg = "action_diff"
-            run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}"
-            run = swanlab.init(project="RARL", name=run_name, config=args)
-            swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
+        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}"
+        # run = swanlab.init(project="RARL", name=run_name, config=args)
+        swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
+        callbacks_common.append(swan_cb)
 
-            # 2025-10-02 wq 初始化训练
-            model_def_first = create_model_def(args, env_def_first, replay_buffer_class_def, device,
-                                               best_model_path_def, True)
-            model_def_first.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                                  callback=checkpoint_callback_def)
-
-            model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
-
-            # 2025-10-04 wq 需要另外的模型来加载上次训练好的模型
-            model_def = create_model_def(args, env_def, replay_buffer_class_def, device, best_model_path_def, False)
-            model_def.actor.load_state_dict(model_def_first.actor.state_dict())
-
-            env_def_first.close()
-            del model_def_first
-
-            for i in range(args.loop_nums):
-                model_old_def.actor.load_state_dict(model_def.actor.state_dict())
-
-                eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_old_def,
-                                                           attack_eps = args.attack_eps,
-                                                           best_model_save_path=eval_best_model_path_adv,
-                                                           n_eval_episodes=20,
-                                                           eval_freq=args.n_steps * 10,
-                                                           unlimited_attack=args.unlimited_attack,
-                                                           attack_method=args.attack_method)
-                #
-                model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                                callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv],
-                                trained_def=model_old_def,  reset_num_timesteps=False, log_interval = args.print_interval)
-
-                model_old_adv.policy.load_state_dict(model_adv.policy.state_dict())
-
-                eval_callback_def = CustomEvalCallback_def(eval_env_adv, trained_agent=model_old_def,
-                                                           trained_adv=model_old_adv,
-                                                           attack_eps=args.attack_eps,
-                                                           best_model_save_path=eval_best_model_path_def,
-                                                           n_eval_episodes=20,
-                                                           eval_freq=args.n_steps * 10,
-                                                           unlimited_attack=args.unlimited_attack,
-                                                           attack_method=args.attack_method)
-
-                model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                                callback=[checkpoint_callback_def, swan_cb, eval_callback_def], trained_agent=model_old_def,
-                                trained_adv=model_old_adv,  reset_num_timesteps=False, log_interval = args.print_interval)
-            model_old_def.actor.load_state_dict(model_def.actor.state_dict())
-
-            model_adv_last = create_model_adv(args, env_adv_last, rollout_buffer_class_adv, device, best_model_path_adv)
-            eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
-                                                       attack_eps=args.attack_eps,
-                                                       best_model_save_path=eval_best_model_path_adv,
-                                                       n_eval_episodes=20,
-                                                       eval_freq=args.n_steps * 10,
-                                                       unlimited_attack=args.unlimited_attack,
-                                                       attack_method=args.attack_method)
-            model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
-                            callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv_last],
-                            trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
-
-            '''
-            model_old_def.actor.load_state_dict(model_def.actor.state_dict())
-
-            model_adv_last = create_model_adv(args, env_adv_last, rollout_buffer_class_adv, device, best_model_path_adv)
-            eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
-                                                       attack_eps=args.attack_eps,
-                                                       best_model_save_path=eval_best_model_path_adv,
-                                                       n_eval_episodes=20,
-                                                       eval_freq=args.n_steps * 10,
-                                                       unlimited_attack=args.unlimited_attack,
-                                                       attack_method=args.attack_method)
-            model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
-                            callback=[checkpoint_callback_adv_last, swan_cb, eval_callback_adv_last],
-                            trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
-            '''
-
-            # Save the agent
-            eval_env_def.close()
-            eval_env_adv.close()
-            eval_env_adv_last.close()
-
-            model_adv_last.save(os.path.join(eval_adv_log_path, "lunar"))
-            del model_adv_last
-            env_adv_last.close()
-
-            del model_adv
-            env_adv.close()
-
-            model_def.save(os.path.join(eval_def_log_path, "lunar"))
-            del model_def
-            env_def.close()
+    # 2025-10-26 wq 加载专家模型
+    # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
+    defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, args.addition_msg, "1", "lunar")
+    trained_expert = SAC.load(defense_model_expert_path, device=device)
+    # 2025-10-26 wq 初始化占位用的“旧”模型
+    model_old_def = SAC("MlpPolicy", env_def, device=device)# 只需要结构，不需要训练
+    model_old_adv = PPO("MlpPolicy", env_adv, device=device)# PPO结构
 
 
-    else:
-        # 2025-10-02 wq 初始化训练
-        model_def_first = create_model_def(args, env_def_first, replay_buffer_class_def, device,
-                                           best_model_path_def, True)
-        model_def_first.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                              callback=checkpoint_callback_def)
-
-        env_def_first.close()
+    if args.adv_test:
+        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-only_attacker-{args.attack_eps}"
+        # run = swanlab.init(project="RARL", name=run_name, config=args)
+        swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
 
         model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
 
+        # 2025-10-16 wq 测试
+        defense_base_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, str(args.attack_eps), str(args.seed),  "lunar")
+        model_def = SAC.load(defense_base_model_path, device=device)
+
+
+        eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_def,
+                                                   attack_eps=args.attack_eps,
+                                                   best_model_save_path=eval_best_model_path_adv,
+                                                   n_eval_episodes=20,
+                                                   eval_freq=args.n_steps * 10,
+                                                   unlimited_attack=args.unlimited_attack,
+                                                   attack_method=args.attack_method)
+
+        model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                        callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv],
+                        trained_def=model_def, reset_num_timesteps=False, log_interval=args.print_interval)
+
+        eval_env_def.close()
+        eval_env_adv.close()
+
+        model_adv.save(os.path.join(eval_adv_log_path, "lunar"))
+        del model_adv
+        env_adv.close()
+
+        del model_def
+        env_def.close()
+
+    else:
+        # 2025-10-02 wq 防御者预训练 (Standard SAC)
+        print("=== Phase 1: Pre-training Defender (Standard SAC) ===")
+        model_def_pre = create_model_def(args, env_def_first, replay_buffer_class_def, device,
+                                           best_model_path_def, True)
+        model_def_pre.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                              callback=checkpoint_callback_def)
+
         # 2025-10-04 wq 需要另外的模型来加载上次训练好的模型
         model_def = create_model_def(args, env_def, replay_buffer_class_def, device, best_model_path_def, False)
-        model_def.actor.load_state_dict(model_def_first.actor.state_dict())
+        model_def.policy.load_state_dict(model_def_pre.policy.state_dict())  # 复制完整策略
 
+        env_def_first.close()
+        del model_def_pre
+        model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
+
+        print("=== Phase 2: Adversarial Training Loop ===")
         for i in range(args.loop_nums):
-            model_old_def.actor.load_state_dict(model_def.actor.state_dict())
+            print(f"--- Loop {i + 1}/{args.loop_nums} ---")
+            # 2025-10-26 wq 更新旧防御者用于攻击者训练
+            # model_old_def.actor.load_state_dict(model_def.actor.state_dict())
+            model_old_def.policy.load_state_dict(model_def.policy.state_dict())
+            model_old_def.policy.set_training_mode(False)  # 确保是评估模式
 
             eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_old_def,
-                                                       attack_eps=args.attack_eps,
+                                                       attack_eps = args.attack_eps,
                                                        best_model_save_path=eval_best_model_path_adv,
                                                        n_eval_episodes=20,
                                                        eval_freq=args.n_steps * 10,
@@ -351,10 +273,11 @@ def main():
                                                        attack_method=args.attack_method)
             #
             model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                            callback=[checkpoint_callback_adv, eval_callback_adv],
-                            trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
-
+                            callback=[checkpoint_callback_adv, eval_callback_adv] + callbacks_common,
+                            trained_def=model_old_def,  reset_num_timesteps=False, log_interval = args.print_interval)
+            # 2025-10-26 wq 更新旧攻击者用于防御者训练
             model_old_adv.policy.load_state_dict(model_adv.policy.state_dict())
+            model_old_adv.policy.set_training_mode(False)
 
             eval_callback_def = CustomEvalCallback_def(eval_env_adv, trained_agent=model_old_def,
                                                        trained_adv=model_old_adv,
@@ -364,13 +287,19 @@ def main():
                                                        eval_freq=args.n_steps * 10,
                                                        unlimited_attack=args.unlimited_attack,
                                                        attack_method=args.attack_method)
-
+            print("Training Defender...")
             model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                            callback=[checkpoint_callback_def, eval_callback_def], trained_agent=model_old_def,
-                            trained_adv=model_old_adv, reset_num_timesteps=False, log_interval=args.print_interval)
+                            callback=[checkpoint_callback_def, eval_callback_def] + callbacks_common, trained_agent=model_old_def,
+                            trained_adv=model_old_adv, trained_expert=trained_expert, reset_num_timesteps=False, log_interval = args.print_interval)
+        # 2025-10-26 wq 最后阶段：攻击测试
+        print("=== Phase 3: Final Attack Phase ===")
+
+        # model_old_def.actor.load_state_dict(model_def.actor.state_dict())
+        model_old_def.policy.load_state_dict(model_def.policy.state_dict())
+        model_old_def.policy.set_training_mode(False)
 
         model_adv_last = create_model_adv(args, env_adv_last, rollout_buffer_class_adv, device, best_model_path_adv)
-        eval_callback_adv = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_def,
+        eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
                                                    attack_eps=args.attack_eps,
                                                    best_model_save_path=eval_best_model_path_adv,
                                                    n_eval_episodes=20,
@@ -378,8 +307,8 @@ def main():
                                                    unlimited_attack=args.unlimited_attack,
                                                    attack_method=args.attack_method)
         model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
-                             callback=[checkpoint_callback_adv, eval_callback_adv],
-                             trained_def=model_def, reset_num_timesteps=False, log_interval=args.print_interval)
+                        callback=[checkpoint_callback_adv, eval_callback_adv_last] + callbacks_common,
+                        trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
 
         # Save the agent
         eval_env_def.close()
@@ -388,14 +317,14 @@ def main():
 
         model_adv_last.save(os.path.join(eval_adv_log_path, "lunar"))
         del model_adv_last
+        env_adv_last.close()
+
         del model_adv
         env_adv.close()
-        env_adv_last.close()
 
         model_def.save(os.path.join(eval_def_log_path, "lunar"))
         del model_def
         env_def.close()
-
 
 if __name__ == '__main__':
     main()

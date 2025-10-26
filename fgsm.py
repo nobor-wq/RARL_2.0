@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.01,
+def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
                  device="cpu", num_iterations=50):
     alpha = epsilon/num_iterations
     device = torch.device(device)

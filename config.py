@@ -86,6 +86,7 @@ def get_config():
     parser.add_argument('--adv_test', action='store_true', help='only test attacker')
     parser.add_argument('--adv_algo_name', default="attacker_v168_20250813_2342_2_57_005.pth", help='attack algorithm')
     parser.add_argument('--action_diff', action='store_true', help='Action difference constraint')
+    parser.add_argument('--use_expert', action='store_true', help='whether to use expert')
 
 
     return parser
