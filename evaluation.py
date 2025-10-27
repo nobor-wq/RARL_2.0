@@ -4,7 +4,7 @@ import torch as th
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 from stable_baselines3.common.utils import obs_as_tensor
 from fgsm import FGSM_v2
-from policy import FniNet
+from policy import FniNet, IGCARLNet
 
 
 
@@ -44,7 +44,7 @@ def evaluate_policy_adv(
                 obs_tensor = obs_as_tensor(observations, model.device)
                 if obs_tensor.dim() == 1:
                     obs_tensor = obs_tensor.unsqueeze(0)  # (1, obs_dim)
-                if isinstance(trained_agent, FniNet):
+                if isinstance(trained_agent, (FniNet, IGCARLNet)):
                     actions, std, _action = trained_agent(obs_tensor[:, :-2])
                     actions = actions.detach().cpu().numpy()
                 else:
@@ -861,7 +861,7 @@ def attack_process(obs_tensor, adv_action_mask, clipped_adv_actions, actions, at
             final_action[attack_idx] = selected_adv_actions.detach().cpu().numpy() if th.is_tensor(
                 selected_adv_actions) else selected_adv_actions
         else:
-            if isinstance(trained_agent, FniNet):
+            if isinstance(trained_agent, (FniNet, IGCARLNet)):
                 adv_action_fromState, _, _ = trained_agent(adv_state)
                 adv_action = adv_action_fromState.detach().cpu().numpy()
             else:

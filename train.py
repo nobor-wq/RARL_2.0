@@ -18,6 +18,7 @@ from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import os
 from swanlab.integration.sb3 import SwanLabCallback
+from policy import IGCARLNet
 
 def create_model_adv(args, env, rollout_buffer_class, device, best_model_path, run=None):
     """
@@ -116,7 +117,7 @@ def main():
     best_model_path_def = os.path.join(eval_def_log_path, "best_model")
     eval_best_model_path_def = os.path.join(eval_def_log_path, "eval_best_model")
 
-    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, str(args.attack_eps), str(args.seed), args.addition_msg)
+    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, args.algo, str(args.attack_eps), str(args.seed), args.addition_msg)
     os.makedirs(eval_adv_log_path, exist_ok=True)
     best_model_path_adv = os.path.join(eval_adv_log_path, "best_model")
     eval_best_model_path_adv = os.path.join(eval_adv_log_path, "eval_best_model")
@@ -197,25 +198,25 @@ def main():
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
         callbacks_common.append(swan_cb)
 
-    # 2025-10-26 wq 加载专家模型
-    # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
-    defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, args.addition_msg, "1", "lunar")
-    trained_expert = SAC.load(defense_model_expert_path, device=device)
-    # 2025-10-26 wq 初始化占位用的“旧”模型
-    model_old_def = SAC("MlpPolicy", env_def, device=device)# 只需要结构，不需要训练
-    model_old_adv = PPO("MlpPolicy", env_adv, device=device)# PPO结构
-
-
     if args.adv_test:
-        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-only_attacker-{args.attack_eps}"
+        run_name_adv = f"{args.attack_method}-{args.algo}-{args.seed}-only_attacker-{args.attack_eps}"
         # run = swanlab.init(project="RARL", name=run_name, config=args)
-        swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
-
+        swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name_adv, verbose=2)
         model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
 
         # 2025-10-16 wq 测试
-        defense_base_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, str(args.attack_eps), str(args.seed),  "lunar")
-        model_def = SAC.load(defense_base_model_path, device=device)
+        if args.algo == "IGCARL":
+            prefix = "./logs/eval_def/" + os.path.join(args.algo, args.env_name)
+            filename = f'{args.model_name}.pth'
+            model_path_drl = os.path.join(prefix, filename)
+            if not os.path.isfile(model_path_drl):
+                raise FileNotFoundError(f"找不到模型文件：{model_path_drl}")
+            model_def = IGCARLNet(state_dim=26, action_dim=1).to(device)
+            model_def.load_state_dict(th.load(model_path_drl, map_location=device))
+            model_def.eval()
+        elif args.algo == "RARL":
+            defense_base_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, str(args.attack_eps), str(args.seed),  "lunar")
+            model_def = SAC.load(defense_base_model_path, device=device)
 
 
         eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_def,
@@ -226,12 +227,13 @@ def main():
                                                    unlimited_attack=args.unlimited_attack,
                                                    attack_method=args.attack_method)
 
-        model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+        model_adv.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
                         callback=[checkpoint_callback_adv, swan_cb, eval_callback_adv],
                         trained_def=model_def, reset_num_timesteps=False, log_interval=args.print_interval)
 
         eval_env_def.close()
         eval_env_adv.close()
+
 
         model_adv.save(os.path.join(eval_adv_log_path, "lunar"))
         del model_adv
@@ -241,6 +243,15 @@ def main():
         env_def.close()
 
     else:
+        # 2025-10-26 wq 加载专家模型
+        # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
+        defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, args.addition_msg,
+                                                 "1", "lunar")
+        trained_expert = SAC.load(defense_model_expert_path, device=device)
+        # 2025-10-26 wq 初始化占位用的“旧”模型
+        model_old_def = SAC("MlpPolicy", env_def, device=device)  # 只需要结构，不需要训练
+        model_old_adv = PPO("MlpPolicy", env_adv, device=device)  # PPO结构
+
         # 2025-10-02 wq 防御者预训练 (Standard SAC)
         print("=== Phase 1: Pre-training Defender (Standard SAC) ===")
         model_def_pre = create_model_def(args, env_def_first, replay_buffer_class_def, device,

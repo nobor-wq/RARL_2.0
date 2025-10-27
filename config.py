@@ -9,7 +9,7 @@ def get_config():
     # env parameters
     parser.add_argument('--env_name', default="TrafficEnv3-v0", help='name of the environment to run')
     parser.add_argument('--addition_msg', default="", help='additional message of the training process')
-    parser.add_argument('--algo', default="SAC", help='training algorithm')
+    parser.add_argument('--algo', default="RARL", help='training algorithm')
     parser.add_argument('--algo_adv', default="PPO", help='training adv algorithm')
     parser.add_argument('--path_def', default="./logs/eval_def/", help='path of the trained model')
     parser.add_argument('--path_adv', default="./logs/eval_adv/", help='path of the trained model')
@@ -48,7 +48,6 @@ def get_config():
     # Attack parameters
     parser.add_argument('--attack', action='store_true', help='whether to change the env for attack')
     parser.add_argument('--attack_method', default="fgsm", help='which attack method to be applied')
-    parser.add_argument('--train_eps', default="005_1", help='epsilon-ball around init state')
     parser.add_argument('--attack_eps', type=float, default=0.01, help='epsilon-ball around init state')
     parser.add_argument('--attack_iteration', default=50, help='iterations for attack method')
     parser.add_argument('--step_size', default=0.0075, help='step size for fgsm')
@@ -83,10 +82,14 @@ def get_config():
                                                                       'help defense training')
 
     parser.add_argument('--base_cost', type=float, default=0.02, help='epsilon-ball around init state')
+    parser.add_argument('--train_eps', default="005_1", help='epsilon when training')
     parser.add_argument('--adv_test', action='store_true', help='only test attacker')
     parser.add_argument('--adv_algo_name', default="attacker_v168_20250813_2342_2_57_005.pth", help='attack algorithm')
     parser.add_argument('--action_diff', action='store_true', help='Action difference constraint')
     parser.add_argument('--use_expert', action='store_true', help='whether to use expert')
+    parser.add_argument('--use_kl', action='store_true', help='whether to use expert')
+    parser.add_argument('--kl_coef', type=float, default=0.02, help='epsilon-ball around init state')
+    parser.add_argument('--model_name', default="defender_v258_20250806_1056_4_5_005", help='训练IGCARL攻击者时使用的防御者模型')
 
 
     return parser

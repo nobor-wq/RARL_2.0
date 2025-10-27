@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from policy import IGCARLNet
 
 def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
                  device="cpu", num_iterations=50):
@@ -38,13 +39,16 @@ def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
     for i in range(num_iterations):
         last_state.requires_grad = True
 
-        outputs = victim_agent.policy(last_state.unsqueeze(0), deterministic=True)
-
-        if outputs[0].dim() > 1:
-            outputs = outputs[0].squeeze(0)
+        if isinstance(victim_agent, IGCARLNet):
+            outputs,_, _ = victim_agent(last_state)
+            victim_agent.zero_grad()
         else:
-            outputs = outputs[0]
-        victim_agent.policy.zero_grad()
+            outputs = victim_agent.policy(last_state.unsqueeze(0), deterministic=True)
+            if outputs[0].dim() > 1:
+                outputs = outputs[0].squeeze(0)
+            else:
+                outputs = outputs[0]
+            victim_agent.policy.zero_grad()
 
         cost = -loss(outputs, adv_action).to(device)
         cost.backward()

@@ -34,8 +34,8 @@ class CustomEvalCallback_adv(EvalCallback):
         self.trained_agent = trained_agent
         self.n_eval_episodes = n_eval_episodes
         self.eval_freq = eval_freq
-        self.best_mean_reward = -np.inf
-        self.last_mean_reward = -np.inf
+        self.best_mean_reward = np.inf
+        self.last_mean_reward = np.inf
         self.deterministic = deterministic
         self.render = render
         self.unlimited_attack = unlimited_attack
@@ -140,7 +140,7 @@ class CustomEvalCallback_adv(EvalCallback):
             self.logger.record("time_adv/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
-            if mean_reward > self.best_mean_reward:
+            if mean_reward < self.best_mean_reward:
                 if self.verbose >= 1:
                     print("New best mean reward!")
                 if self.best_model_save_path is not None:

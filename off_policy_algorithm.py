@@ -111,6 +111,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 actions_tensor = th.tensor(actions, device=self.device)
 
                 # infos 可能是 dict 或 list
+                print("DEBUG infos: ", self._last_infos)
                 if isinstance(self._last_infos, dict):
                     info0 = self._last_infos
                 elif isinstance(self._last_infos, (list, tuple)) and len(self._last_infos) > 0:
@@ -118,6 +119,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 else:
                     raise ValueError(f"Invalid infos format: {type(self._last_infos)}")
                 # 如果没有 attReStep 键则报错
+                print("DEBUG info0: ", info0)
                 if 'attReStep' not in info0:
                     raise KeyError(f"'attReStep' key not found in info: {info0}")
                 attReStep = float(info0['attReStep'])

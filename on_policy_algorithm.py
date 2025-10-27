@@ -234,7 +234,7 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
 
     def _dump_logs(self, iteration):
         super()._dump_logs(iteration)
-        if safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]) >= self.max_epi_reward:
+        if safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]) <= self.max_epi_reward:
             self.save(self.best_model_path)
             self.max_epi_reward = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
 

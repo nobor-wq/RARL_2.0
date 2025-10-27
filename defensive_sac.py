@@ -1,4 +1,3 @@
-from torch import no_grad
 from off_policy_algorithm import OffPolicyDefensiveAlgorithm, OffPolicyBaseAlgorithm
 from stable_baselines3 import PPO, SAC, TD3
 from policy import FniNet
@@ -30,6 +29,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.trained_expert = None
         self.action_diff = custom_args.action_diff
         self.use_expert = custom_args.use_expert
+        self.kl_div =  custom_args.use_kl
+        self.kl_coef = custom_args.kl_coef if hasattr(custom_args, 'kl_coef') else 0.1
 
         # 2025-09-23 wq 加载敌手和防御者
         # if self.best_model:
@@ -216,23 +217,76 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
 
             if self.action_diff:
                 if self.use_expert:
-                    with th.no_grad():
-                        actions_clean_np, _states = self.trained_expert.predict(obs.cpu(), deterministic=True)
-                    actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
-                    per_elem_sq = (actions_clean - actions_pi) ** 2
-                    per_sample_mse = per_elem_sq.mean(dim=1)
-                    mask = obs_is_per.to(device=per_sample_mse.device)
-                    if mask.dtype.is_floating_point:
-                        mask = mask > 0.5
-                    else:
-                        mask = mask.bool()
-                    mask = mask.view(-1)
 
-                    # apply mask: false -> zero loss, true -> keep per-sample mse
-                    mask_float = mask.to(dtype=per_sample_mse.dtype)
-                    masked_per_sample = per_sample_mse * mask_float  # (B,)
-                    action_loss_masked = masked_per_sample.mean()
-                    actor_loss = actor_loss_policy + action_loss_masked
+                    if self.kl_div:
+                        # --- 核心修改开始 ---
+                        # 步骤 1: 获取专家在“干净”状态下的策略分布
+                        with th.no_grad():
+                            # 直接调用 actor 获取均值和 log_std
+                            # 注意：不同的 SB3 版本，Actor 的返回值可能略有不同，但通常是 (mean, log_std)
+                            # 我们使用 get_action_dist_params，这是许多版本都有的
+                            mean_actions_expert, log_std_expert, _ = self.trained_expert.policy.actor.get_action_dist_params(
+                                obs)
+                            # 手动构建正态分布对象
+                            # SAC 通常使用 TanhSquashedGaussianDistribution，但为了计算 KL 散度，
+                            # 我们先计算基础高斯分布的 KL 散度，这通常足够作为约束。
+                            # 如果需要更精确，可以使用 SB3 提供的分布类。
+                            # 这里我们使用标准正态分布，因为它简单且通常有效。
+                            dist_expert = th.distributions.Normal(mean_actions_expert, th.exp(log_std_expert))
+
+                        # 步骤 2: 获取当前防御模型在“可能被扰动”状态下的策略分布
+                        # 使用同样的方法获取当前模型的分布参数
+                        mean_actions_current, log_std_current, _ = self.policy.actor.get_action_dist_params(obs_used)
+                        dist_current = th.distributions.Normal(mean_actions_current, th.exp(log_std_current))
+
+                        # --- 核心修改结束 ---
+
+                        # 步骤 3: 计算两个分布之间的KL散度
+                        # sum(-1) 是为了对动作维度求和，得到每个样本的 KL 散度标量
+                        kl_div = th.distributions.kl.kl_divergence(dist_expert, dist_current).sum(-1)
+
+                        # 步骤 4: 使用掩码
+                        mask = obs_is_per.to(device=kl_div.device, dtype=th.bool).view(-1)
+                        masked_kl_div = kl_div[mask]
+
+                        if masked_kl_div.numel() > 0:
+                            kl_loss_masked = masked_kl_div.mean()
+                        else:
+                            kl_loss_masked = th.tensor(0.0, device=self.device)
+
+                        # 步骤 5: 添加到总损失
+                        actor_loss = actor_loss_policy + self.kl_coef * kl_loss_masked
+                        print("DEBUG actor_loss_policy: ", actor_loss_policy)
+                        print("DEBUG self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
+                        print("DEBUG actor_loss: ", actor_loss)
+
+                        self.logger.record("train_def/kl_loss", kl_loss_masked.item())
+                    else:
+                        with th.no_grad():
+                            actions_clean_np, _states = self.trained_expert.predict(obs.cpu(), deterministic=True)
+                        actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
+                        per_elem_sq = (actions_clean - actions_pi) ** 2
+                        print("DEBUG per_elem_sq: ", per_elem_sq, " shape: ", per_elem_sq.shape)
+                        per_sample_mse = per_elem_sq.mean(dim=1)
+                        print("DEBUG per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
+                        mask = obs_is_per.to(device=per_sample_mse.device)
+                        print("DEBUG mask: ", mask, "shape: ", mask.shape)
+                        if mask.dtype.is_floating_point:
+                            mask = mask > 0.5
+                        else:
+                            mask = mask.bool()
+                        mask = mask.view(-1)
+                        print("DEBUG mask_1: ", mask, "shape_1: ", mask.shape)
+                        # apply mask: false -> zero loss, true -> keep per-sample mse
+                        mask_float = mask.to(dtype=per_sample_mse.dtype)
+                        print("DEBUG mask_float: ", mask_float, " shape: ", mask_float.shape)
+                        masked_per_sample = per_sample_mse * mask_float  # (B,)
+                        print("DEBUG masked_per_sample: ", masked_per_sample, " shape: ", masked_per_sample.shape)
+                        action_loss_masked = masked_per_sample.mean()
+                        print("DEBUG action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
+                        actor_loss = actor_loss_policy + action_loss_masked * 10
+                        print("DEBUG actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
+                        print("DEBUG actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
                 else:
                     with th.no_grad():
                         actions_clean_np, _states = self.trained_agent.predict(obs.cpu(), deterministic=True)

@@ -61,11 +61,11 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
         #                     weights_only=True))
         #         self.trained_agent.to(self.device)
         #         self.trained_agent.eval()
-        self.max_epi_reward = 0
+        self.max_epi_reward = np.inf
         self.best_model_path = best_model_path
 
         # Get customized parameters
-        self.fni_flag = True if self.algo in ('FNI', 'DARRL') else False
+        self.fni_flag = True if self.algo in ('FNI', 'DARRL', 'IGCARL') else False
 
 
 
