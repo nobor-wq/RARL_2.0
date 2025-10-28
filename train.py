@@ -187,14 +187,17 @@ def main():
     eval_env_adv_last = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
     # 2025-10-26 wq 统一的回调函数列表初始化
     callbacks_common = []
-    if args.swanlab:
-        if args.action_diff:
-            if args.use_expert:
-                args.addition_msg = "action_diff_expert"
-            else:
-                args.addition_msg = "action_diff"
-        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}"
-        # run = swanlab.init(project="RARL", name=run_name, config=args)
+    # 推荐的简化版本
+    if args.swanlab and args.action_diff:
+        msg_parts = ["action_diff"]
+        if args.use_expert:
+            msg_parts.append("expert")
+            if args.use_kl:
+                msg_parts.append("kl")
+        args.addition_msg = "_".join(msg_parts)
+
+        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}-{args.train_step}"
+        run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
         callbacks_common.append(swan_cb)
 
@@ -245,7 +248,7 @@ def main():
     else:
         # 2025-10-26 wq 加载专家模型
         # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
-        defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, args.addition_msg,
+        defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name,
                                                  "1", "lunar")
         trained_expert = SAC.load(defense_model_expert_path, device=device)
         # 2025-10-26 wq 初始化占位用的“旧”模型
@@ -317,7 +320,7 @@ def main():
                                                    eval_freq=args.n_steps * 10,
                                                    unlimited_attack=args.unlimited_attack,
                                                    attack_method=args.attack_method)
-        model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
+        model_adv_last.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                         callback=[checkpoint_callback_adv, eval_callback_adv_last] + callbacks_common,
                         trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
 

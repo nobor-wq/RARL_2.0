@@ -11,7 +11,7 @@ import torch as th
 # from perturbation import *
 from fgsm import FGSM_v2
 from PIL import Image
-from policy import FniNet
+from policy import FniNet, IGCARLNet
 
 
 # get parameters from config.py
@@ -43,11 +43,11 @@ env.unwrapped.start()
 if args.attack:
     if args.best_model:
         if args.eval_best_model:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, str(args.seed), 'eval_best_model/best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), 'eval_best_model/best_model')
         else:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, str(args.seed), 'best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo,str(args.train_eps) , str(args.seed), 'best_model')
     else:#str(args.train_eps)
-        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, str(args.train_eps) , str(args.seed), 'lunar')
+        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), 'lunar')
     # 加载训练好的攻击者模型
     if args.algo_adv == 'SAC':
         model = SAC.load(advmodel_path, device=device)
@@ -60,20 +60,39 @@ if args.attack:
 
 
 # 加载训练好的自动驾驶模型
-if args.base:#str(args.seed)
-    defense_model_path = "./logs/eval_def/" + os.path.join("base", args.algo, args.env_name, args.addition_msg, "1")
-else:
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed))
 
-# defense_model_path = os.path.join(args.path, args.env_name, args.algo)
-if args.best_model:
-    model_path = os.path.join(defense_model_path, 'best_model.zip')
-    # model_path = os.path.join(defense_model_path, 'best_model/best_model')
-    #model_path = os.path.join(args.path, args.env_name, args.algo,  'best_model/best_model')
-else:
-    #model_path = os.path.join(args.path, args.env_name, args.algo, args.addition_msg, 'lunar')
+
+
+# if args.base:#str(args.seed)
+#     defense_model_path = "./logs/eval_def/" + os.path.join("base", args.algo, args.env_name, args.addition_msg, "1")
+# else:
+#     defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed))
+#
+# # defense_model_path = os.path.join(args.path, args.env_name, args.algo)
+# if args.best_model:
+#     model_path = os.path.join(defense_model_path, 'best_model.zip')
+#     # model_path = os.path.join(defense_model_path, 'best_model/best_model')
+#     #model_path = os.path.join(args.path, args.env_name, args.algo,  'best_model/best_model')
+# else:
+#     #model_path = os.path.join(args.path, args.env_name, args.algo, args.addition_msg, 'lunar')
+#     model_path = os.path.join(defense_model_path, 'lunar')
+# trained_agent = SAC.load(model_path, device=device)
+
+if args.algo == "IGCARL":
+    prefix = "./logs/eval_def/" + os.path.join(args.algo, args.env_name)
+    filename = f'{args.model_name}.pth'
+    model_path_drl = os.path.join(prefix, filename)
+    if not os.path.isfile(model_path_drl):
+        raise FileNotFoundError(f"找不到模型文件：{model_path_drl}")
+    trained_agent = IGCARLNet(state_dim=26, action_dim=1).to(device)
+    trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
+    trained_agent.eval()
+elif args.algo == "RARL":
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed))
     model_path = os.path.join(defense_model_path, 'lunar')
-trained_agent = SAC.load(model_path, device=device)
+    trained_agent = SAC.load(model_path, device=device)
+
+
 
 # # 加载之前的模型
 # last_model_path = os.path.join(args.path, args.env_name, args.algo, 'best_model/best_model')
@@ -103,7 +122,7 @@ for episode in range(args.train_step):
         obs_tensor = obs_as_tensor(obs, device)
         if args.attack:
             speed_list.append(obs[-4])
-            if args.algo in ('FNI', 'DARRL'):
+            if args.algo in ('FNI', 'DARRL', 'IGCARL'):
                 actions, std, _action = trained_agent(obs_tensor[:-2])
                 actions = actions.detach().cpu().numpy()
             else:
@@ -126,13 +145,14 @@ for episode in range(args.train_step):
                 if args.attack_method == 'direct':
                     action = adv_actions[1]
                 else:
-                    if args.algo in ('FNI', 'DARRL'):
+                    if args.algo in ('FNI', 'DARRL', 'IGCARL'):
                         adv_action_fromState, _, _ = trained_agent(adv_state)
                         action = adv_action_fromState.detach().cpu().numpy()
                     else:
                         adv_action_fromState, _ = trained_agent.predict(adv_state.cpu(), deterministic=True)
-                        print("DEBUG action before attack: ", actions, " adv action: ", adv_actions[1], "action after attack: ", adv_action_fromState)
                         action = adv_action_fromState
+                    print("DEBUG action before attack: ", actions, " adv action: ", adv_actions[1],
+                          "action after attack: ", adv_action_fromState)
             else:
                 print("DEBUG adv_action_mask: ", adv_action_mask)
                 action = actions
@@ -160,7 +180,7 @@ for episode in range(args.train_step):
             speed_list.append(obs[-2])
             #actions = trained_agent.policy(obs_tensor.unsqueeze(0))
             #actions1 = trained_agent.policy(obs_tensor.unsqueeze(0), deterministic=True)
-            if args.algo in ('FNI', 'DARRL'):
+            if args.algo in ('FNI', 'DARRL', 'IGCARL'):
                 actions, std, _action = trained_agent(obs_tensor)
                 actions = actions.cpu().detach().numpy()
             else:
