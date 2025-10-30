@@ -88,15 +88,17 @@ if args.algo == "IGCARL":
     trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
     trained_agent.eval()
 elif args.algo == "RARL":
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed))
-    model_path = os.path.join(defense_model_path, 'lunar')
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed), str(args.trained_step))
+    if args.best_model:
+        model_path = os.path.join(defense_model_path, 'best_model')
+    elif args.eval_best_model:
+        model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
+    else:
+        model_path = os.path.join(defense_model_path, 'lunar')
     trained_agent = SAC.load(model_path, device=device)
 
 
 
-# # 加载之前的模型
-# last_model_path = os.path.join(args.path, args.env_name, args.algo, 'best_model/best_model')
-# last_agent = PPO.load(last_model_path, device=device)
 
 # 进行验证
 rewards = []
@@ -105,16 +107,16 @@ steps = []
 maxSpeed = 15.0
 ct = 0
 sn = 0
-sat = 0
+success_attack_count = 0
 speed_list = []
 attack_count_list = []
-mean_attack_reward_list = []
 for episode in range(args.train_step):
     obs, info = env.reset(options="random")
     # img = env.render()
     speed = 0
     episode_reward = 0
     episode_steps = 0
+    attack_count = 0
     # save_dir = f'./render/{args.env_name}/{args.adv_algo}/{episode}'
     # # # 创建目录（如果不存在的话）
     # os.makedirs(save_dir, exist_ok=True)
@@ -153,12 +155,16 @@ for episode in range(args.train_step):
                         action = adv_action_fromState
                     print("DEBUG action before attack: ", actions, " adv action: ", adv_actions[1],
                           "action after attack: ", adv_action_fromState)
+                attack_count += 1
             else:
                 print("DEBUG adv_action_mask: ", adv_action_mask)
                 action = actions
             #action = adv_action_FGSM[0]
             action = np.column_stack(( action, adv_action_mask))
             obs, reward, done, terminate, info = env.step(action)
+            # 2025-10-30 wq 攻击并且成功碰撞
+            if done and adv_action_mask:
+                success_attack_count += 1
 
             if isinstance(info, dict):
                 info0 = info
@@ -166,16 +172,14 @@ for episode in range(args.train_step):
                 info0 = info[0]
             else:
                 raise ValueError(f"Invalid infos format: {type(info)}")
-
-            # 如果没有 attReStep 键则报错
             if 'reward' not in info0:
                 raise KeyError(f"'reward' key not found in info: {info0}")
 
             r_def = float(info0['reward'])
             c_def = float(info0['cost'])
-
-
             print('step ', episode_steps, 'reward is ', r_def-c_def)
+
+
         else:
             speed_list.append(obs[-2])
             #actions = trained_agent.policy(obs_tensor.unsqueeze(0))
@@ -191,20 +195,16 @@ for episode in range(args.train_step):
         episode_reward += reward
         episode_steps += 1
 
+
         if done:
-            if args.attack:
-                if round(args.adv_steps - obs[-2] * args.adv_steps) != 0:
-                    mean_attack_reward_list.append(1/round(args.adv_steps - obs[-2] * args.adv_steps))
             ct += 1
-            if args.attack:
-                if round(args.adv_steps - obs[-2] * args.adv_steps):
-                    sat += 1
             break
         # if args.use_gui:
         #     img = env.render()
         #     img = Image.fromarray(img)
         #     img.save(f'{save_dir}/{episode_steps}.jpg')
 
+    attack_count_list.append(attack_count)
     # 如果需要，转成GIF
     # if args.to_gif:
     #     gif_generate(save_dir, args.duration)
@@ -214,8 +214,6 @@ for episode in range(args.train_step):
     if args.attack:
         if args.unlimited_attack:
             attack_count_list.append(episode_steps)
-        else:
-            attack_count_list.append(round(args.adv_steps - obs[-2] * args.adv_steps))
     if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv6-v0':
         if xa < -50.0 and ya > 4.0 and done is False:
             sn += 1
@@ -245,36 +243,31 @@ std_steps = np.std(steps)
 # 计算碰撞率
 cr = ct / args.train_step * 100
 sr = sn / args.train_step * 100
-if args.attack:
-    if sum(1 for x in attack_count_list if x > 0) > 0:
-        asr = sat / sum(1 for x in attack_count_list if x > 0) * 100
-    else:
-        asr = 0.00
-else:
-    asr = 0.00
 
 # 计算平均速度
 mean_speed = np.mean(speed_list)
 std_speed = np.std(speed_list)
 
-# 计算平均攻击次数
-attack_list = [x for x in attack_count_list if x != 0]
-mean_attack_times = np.mean(attack_list)
-std_attack_times = np.std(attack_list)
 
-# 计算单次攻击的收益
-mean_attack_reward = np.mean(mean_attack_reward_list)
-std_attack_reward = np.std(mean_attack_reward_list)
-
-print('attack lists ', attack_count_list, 'attack times ', len(attack_list))
 print(f"Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
 print(f"Mean steps: {mean_steps:.2f} +/- {std_steps:.2f}")
 print(f"Mean speed: {mean_speed * maxSpeed:.2f} +/- {std_speed * maxSpeed:.2f}")
-print(f"Mean attack times: {mean_attack_times:.2f} +/- {std_attack_times:.2f}")
 print(f"Collision rate: {cr:.2f}")
 print(f"Success rate: {sr:.2f}")
-print(f"Success attack rate: {asr:.2f}")
-print(f"Reward per attack: {mean_attack_reward:.2f} +/- {std_attack_reward:.2f}")
+
+if args.attack:
+    # 计算平均攻击次数
+    mean_attack_times = np.mean(attack_count_list)
+    std_attack_times = np.std(attack_count_list)
+    # 2025-10-30 wq 计算攻击后成功碰撞的概率
+    asr = success_attack_count / sum(attack_count_list) * 100
+    ep_asr = success_attack_count / args.train_step * 100
+
+    print('attack lists ', attack_count_list, 'attack times ', len(attack_count_list))
+    print(f"Mean attack times: {mean_attack_times:.2f} +/- {std_attack_times:.2f}")
+    print(f"Success attack rate: {asr:.2f}")
+    print(f"episode Success attack rate: {ep_asr:.2f}")
+
 
 # 定义日志文件路径
 log_file = "eval_attack_log.txt"
@@ -291,11 +284,13 @@ with open(log_file, 'a') as f:  # 使用 'a' 模式以追加方式写入文件
     f.write(f"Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}\n")
     f.write(f"Mean steps: {mean_steps:.2f} +/- {std_steps:.2f}\n")
     f.write(f"Mean speed: {mean_speed * maxSpeed:.2f} +/- {std_speed * maxSpeed:.2f}\n")
-    f.write(f"Mean attack times: {mean_attack_times:.2f} +/- {std_attack_times:.2f}\n")
     f.write(f"Collision rate: {cr:.2f}\n")
     f.write(f"Success rate: {sr:.2f}\n")
-    f.write(f"Success attack rate: {asr:.2f}\n")
-    f.write(f"Reward per attack: {mean_attack_reward:.2f} +/- {std_attack_reward:.2f}\n")
+    if args.attack:
+        f.write(f"Mean attack times: {mean_attack_times:.2f} +/- {std_attack_times:.2f}\n")
+        f.write(f"Success attack rate: {asr:.2f}\n")
+        f.write(f"Episode Success attack rate: {ep_asr:.2f}\n")
+
     f.write("-" * 50 + "\n")
 
 
