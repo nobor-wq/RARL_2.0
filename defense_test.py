@@ -43,11 +43,11 @@ env.unwrapped.start()
 if args.attack:
     if args.best_model:
         if args.eval_best_model:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), 'eval_best_model/best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), str(args.trained_step), 'eval_best_model/best_model')
         else:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo,str(args.train_eps) , str(args.seed), 'best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo,str(args.train_eps) , str(args.seed), str(args.trained_step), 'best_model')
     else:#str(args.train_eps)
-        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), 'lunar')
+        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), str(args.trained_step), 'lunar')
     # 加载训练好的攻击者模型
     if args.algo_adv == 'SAC':
         model = SAC.load(advmodel_path, device=device)
@@ -88,7 +88,7 @@ if args.algo == "IGCARL":
     trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
     trained_agent.eval()
 elif args.algo == "RARL":
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed), str(args.trained_step))
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name,  str(args.train_eps), str(args.seed), str(args.trained_step))
     if args.best_model:
         model_path = os.path.join(defense_model_path, 'best_model')
     elif args.eval_best_model:
