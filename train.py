@@ -11,7 +11,7 @@ from stable_baselines3 import PPO, SAC, TD3
 from wandb.integration.sb3 import WandbCallback
 from callback import CustomEvalCallback_adv, CustomEvalCallback_def
 import random
-from buffer import PaddingRolloutBuffer, DecoupleRolloutBuffer, DecouplePaddingRolloutBuffer, ReplayBufferDefender
+from buffer import DecoupleRolloutBuffer, ReplayBufferDefender, DualReplayBufferDefender
 from adversarial_ppo import AdversarialPPO, AdversarialDecouplePPO
 from defensive_sac import DefensiveSAC
 from stable_baselines3.common.buffers import RolloutBuffer
@@ -20,7 +20,7 @@ import os
 from swanlab.integration.sb3 import SwanLabCallback
 from policy import IGCARLNet
 
-def create_model_adv(args, env, rollout_buffer_class, device, best_model_path, run=None):
+def create_model_adv(args, env, device, best_model_path):
     """
     根据 args 配置来创建 基于PPO的敌手模型。
     如果需要 wandb，返回模型时会附带 wandb 配置信息。
@@ -29,78 +29,71 @@ def create_model_adv(args, env, rollout_buffer_class, device, best_model_path, r
     :param rollout_buffer_class: 回放池类型
     :param device: 模型加载设备名
     :param best_model_path: 最优模型存储路径
-    :param run: 是否使用wandb进行日志记录
     """
     # 根据 decouple 来选择模型
     # if args.decouple:
-
     model_class = AdversarialDecouplePPO
+    rollout_buffer_class_adv = DecoupleRolloutBuffer
 
-    if run:
-        model = model_class(args, best_model_path, "MlpPolicy",
-                            env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1,
-                            tensorboard_log=f"runs/{run.id}",
-                            rollout_buffer_class=rollout_buffer_class, device=device)
-    else:
-        model = model_class(args, best_model_path,  "MlpPolicy",
-                            env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1,
-                            rollout_buffer_class=rollout_buffer_class,
-                            device=device)
-    # else:
-    #     model_class = AdversarialPPO
-    #     if run:
-    #         model = model_class(args, best_model_path, "MlpPolicy",
-    #                             env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1, tensorboard_log=f"runs/{run.id}",
-    #                             rollout_buffer_class=rollout_buffer_class, device=device)
-    #     else:
-    #         model = model_class(args, best_model_path, "MlpPolicy",
-    #                             env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1, rollout_buffer_class=rollout_buffer_class,
-    #                             device=device)
+    model = model_class(args, best_model_path,  "MlpPolicy",
+                        env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1,
+                        rollout_buffer_class=rollout_buffer_class_adv,
+                        device=device)
     return model
 
-def create_model_def(args, env, replay_buffer_class_def, device, best_model_path, start, run=None):
+def create_model_def(args, env, device, best_model_path, start):
     """
     根据 args 配置来创建 基于PPO的敌手模型。
     如果需要 wandb，返回模型时会附带 wandb 配置信息。
     :param args: 系统参数
     :param env: 环境名
-    :param replay_buffer_class_def: 回放池类型
     :param device: 模型加载设备名
     :param best_model_path: 最优模型存储路径
     :param start: 判断是否是刚开始的初始化
-    :param run: 是否使用wandb进行日志记录
     """
     # 根据 decouple 来选择模型
-    # if args.decouple:
     if start:
+        # 预训练阶段，使用标准的SAC和它默认的Buffer
         model_class = SAC
+        model = model_class(
+            "MlpPolicy",
+            env,
+            verbose=1,
+            learning_rate=args.lr,
+            batch_size=args.batch_size,
+            device=device,
+        )
     else:
+        # 对抗训练阶段，使用我们自定义的DefensiveSAC
         model_class = DefensiveSAC
 
-    if run:
-        model = model_class(args, best_model_path, "MlpPolicy",
-                            env,  batch_size=args.batch_size, verbose=1,
-                            tensorboard_log=f"runs/{run.id}",
-                            rollout_buffer_class=replay_buffer_class_def, device=device)
-    else:
-        if start:
-            model = model_class("MlpPolicy", env, verbose=1, learning_rate=args.lr, batch_size=args.batch_size, device=device,)
+        # 1. 初始化一个空的参数字典
+        replay_buffer_kwargs = {}
 
+        # 2. 根据条件选择Buffer类并填充参数字典
+        if args.use_DualBuffer:
+            replay_buffer_class_def = DualReplayBufferDefender
+            # 只有当使用DualBuffer时，才需要这个特定参数
+            replay_buffer_kwargs["adv_sample_ratio"] = args.adv_sample_ratio  # 您可以将其改为 args.adv_sample_ratio
+            # 如果未来还有其他参数，可以继续添加，例如:
+            # replay_buffer_kwargs["another_param"] = 123
         else:
-            model = model_class(args, best_model_path, "MlpPolicy",
-                                env,  batch_size=args.batch_size, verbose=1,
-                                replay_buffer_class=replay_buffer_class_def,
-                                device=device)
-    # else:
-    #     model_class = AdversarialPPO
-    #     if run:
-    #         model = model_class(args, best_model_path, "MlpPolicy",
-    #                             env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1, tensorboard_log=f"runs/{run.id}",
-    #                             rollout_buffer_class=rollout_buffer_class, device=device)
-    #     else:
-    #         model = model_class(args, best_model_path, "MlpPolicy",
-    #                             env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1, rollout_buffer_class=rollout_buffer_class,
-    #                             device=device)
+            replay_buffer_class_def = ReplayBufferDefender
+            # 使用旧的Buffer时，kwargs为空字典，不会传入任何额外参数，是安全的
+
+        # 3. 在创建模型时，同时传入 replay_buffer_class 和 replay_buffer_kwargs
+        model = model_class(
+            args,
+            best_model_path,
+            "MlpPolicy",
+            env,
+            batch_size=args.batch_size,
+            verbose=1,
+            replay_buffer_class=replay_buffer_class_def,
+            replay_buffer_kwargs=replay_buffer_kwargs,  # <--- 将参数字典传递给模型
+            device=device,
+        )
+
     return model
 
 
@@ -110,15 +103,34 @@ def main():
     parser = get_config()
     args = parser.parse_args()
 
-    if args.use_kl:
-        args.addition_msg = "kl"
+    msg_parts = []
+    if args.action_diff:
+        msg_parts.append("action_diff")
+    if args.use_expert:
+        msg_parts.append("expert")
+        # 依赖于 expert 的技术，可以进行嵌套
+        if args.use_kl:
+            msg_parts.append("kl")
+    # 新增的 Buffer 技术
+    if args.use_DualBuffer:
+        msg_parts.append("DualBuffer")
+    if not msg_parts:
+        # 如果没有任何特殊技术，就是一个基础版本
+        addition_msg = "base"
+    else:
+        addition_msg = "_".join(msg_parts)
+
+    # (可选但推荐) 将生成的消息存回args，方便后续使用
+    args.addition_msg = addition_msg
+
+    print(f"[*] 本次实验标签: {args.addition_msg}")  # 打印出来方便确认
     # defenfer and attacker log path
     eval_def_log_path = os.path.join(args.path_def, args.algo, args.env_name, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
     os.makedirs(eval_def_log_path, exist_ok=True)
     best_model_path_def = os.path.join(eval_def_log_path, "best_model")
     eval_best_model_path_def = os.path.join(eval_def_log_path, "eval_best_model")
 
-    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, args.addition_msg, args.algo, str(args.attack_eps), str(args.seed), str(args.train_step))
+    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name,  args.algo, args.addition_msg,str(args.attack_eps), str(args.seed), str(args.train_step))
     os.makedirs(eval_adv_log_path, exist_ok=True)
     best_model_path_adv = os.path.join(eval_adv_log_path, "best_model")
     eval_best_model_path_adv = os.path.join(eval_adv_log_path, "eval_best_model")
@@ -147,16 +159,6 @@ def main():
     model_path_adv = os.path.join(eval_adv_log_path, 'model')
     os.makedirs(model_path_adv, exist_ok=True)
     checkpoint_callback_adv = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
-    # checkpoint_callback_adv_last = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
-    # whether padding
-    # rollout_buffer_map = {
-    #     (True, True): DecouplePaddingRolloutBuffer,
-    #     (True, False): PaddingRolloutBuffer,
-    #     (False, True): DecoupleRolloutBuffer,
-    #     (False, False): RolloutBuffer
-    # }
-    replay_buffer_class_def= ReplayBufferDefender
-    rollout_buffer_class_adv = DecoupleRolloutBuffer
 
     def make_env(seed, rank, attack, eval_t=False):
         def _init():
@@ -166,7 +168,6 @@ def main():
             env.unwrapped.start()
             env.reset(seed=seed + rank)
             return env
-
         return _init
 
     num_envs = args.num_envs if hasattr(args, 'num_envs') else 1
@@ -188,17 +189,9 @@ def main():
     eval_env_adv_last = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
     # 2025-10-26 wq 统一的回调函数列表初始化
     callbacks_common = []
-    # 推荐的简化版本
-    if args.swanlab and args.action_diff:
-        msg_parts = ["action_diff"]
-        if args.use_expert:
-            msg_parts.append("expert")
-            if args.use_kl:
-                msg_parts.append("kl")
 
-        swanlab_name = "_".join(msg_parts)
-
-        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{swanlab_name}-{args.train_step}"
+    if args.swanlab:
+        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}-{args.train_step}"
         run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
         callbacks_common.append(swan_cb)
@@ -207,7 +200,7 @@ def main():
         run_name_adv = f"{args.attack_method}-{args.algo}-{args.seed}-only_attacker-{args.attack_eps}"
         # run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name_adv, verbose=2)
-        model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
+        model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
 
         # 2025-10-16 wq 测试
         if args.algo == "IGCARL":
@@ -259,18 +252,18 @@ def main():
 
         # 2025-10-02 wq 防御者预训练 (Standard SAC)
         print("=== Phase 1: Pre-training Defender (Standard SAC) ===")
-        model_def_pre = create_model_def(args, env_def_first, replay_buffer_class_def, device,
+        model_def_pre = create_model_def(args, env_def_first, device,
                                            best_model_path_def, True)
         model_def_pre.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                               callback=checkpoint_callback_def)
 
         # 2025-10-04 wq 需要另外的模型来加载上次训练好的模型
-        model_def = create_model_def(args, env_def, replay_buffer_class_def, device, best_model_path_def, False)
+        model_def = create_model_def(args, env_def, device, best_model_path_def, False)
         model_def.policy.load_state_dict(model_def_pre.policy.state_dict())  # 复制完整策略
 
         env_def_first.close()
         del model_def_pre
-        model_adv = create_model_adv(args, env_adv, rollout_buffer_class_adv, device, best_model_path_adv)
+        model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
 
         print("=== Phase 2: Adversarial Training Loop ===")
         for i in range(args.loop_nums):
@@ -314,7 +307,7 @@ def main():
         model_old_def.policy.load_state_dict(model_def.policy.state_dict())
         model_old_def.policy.set_training_mode(False)
 
-        model_adv_last = create_model_adv(args, env_adv_last, rollout_buffer_class_adv, device, best_model_path_adv)
+        model_adv_last = create_model_adv(args, env_adv_last, device, best_model_path_adv)
         eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
                                                    attack_eps=args.attack_eps,
                                                    best_model_save_path=eval_best_model_path_adv,
