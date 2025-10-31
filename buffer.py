@@ -294,10 +294,19 @@ class DualReplayBufferDefender(ReplayBuffer):
 
         return self._get_samples_from_inds(normal_batch_inds, adv_batch_inds, env=env)
 
+    # 在 buffer.py 的 DualReplayBufferDefender 类中
+
     def _get_samples_from_inds(self, normal_batch_inds: np.ndarray, adv_batch_inds: np.ndarray, env=None):
-        # --- 为两组样本随机采样环境索引 ---
+        # --- 随机采样环境索引 ---
         normal_env_indices = np.random.randint(0, high=self.n_envs, size=(len(normal_batch_inds),))
         adv_env_indices = np.random.randint(0, high=self.n_envs, size=(len(adv_batch_inds),))
+
+        # --- 定义期望的形状 ---
+        # obs_shape 是 (obs_dim,)，例如 (26,)
+        # 我们期望的二维形状是 (num_samples, obs_dim)，例如 (32, 26)
+        # 空数组的形状应该是 (0, obs_dim)，例如 (0, 26)
+        expected_obs_shape = (0, *self.obs_shape)
+        expected_action_shape = (0, self.action_dim)
 
         # --- 从正常缓冲区获取数据 ---
         if len(normal_batch_inds) > 0:
@@ -314,12 +323,18 @@ class DualReplayBufferDefender(ReplayBuffer):
                         1 - self.normal_timeouts[normal_batch_inds, normal_env_indices])).reshape(-1, 1)
             normal_rewards = self._normalize_reward(
                 self.normal_rewards[normal_batch_inds, normal_env_indices].reshape(-1, 1), env)
-            # 对于正常数据，obs_eps就是obs的拷贝
             normal_obs_eps = normal_obs
             normal_is_per = np.zeros_like(normal_dones, dtype=bool)
-        else:  # 如果没有正常样本，创建空数组
-            normal_obs, normal_next_obs, normal_actions, normal_dones, normal_rewards, normal_obs_eps, normal_is_per = [
-                np.array([]) for _ in range(7)]
+        else:
+            # --- 核心修改点 1 ---
+            # 如果没有正常样本，创建正确维度的空数组
+            normal_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            normal_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            normal_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
+            normal_dones = np.zeros((0, 1), dtype=np.float32)
+            normal_rewards = np.zeros((0, 1), dtype=np.float32)
+            normal_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            normal_is_per = np.zeros((0, 1), dtype=bool)
 
         # --- 从对抗缓冲区获取数据 ---
         if len(adv_batch_inds) > 0:
@@ -337,32 +352,31 @@ class DualReplayBufferDefender(ReplayBuffer):
             adv_rewards = self._normalize_reward(self.adv_rewards[adv_batch_inds, adv_env_indices].reshape(-1, 1), env)
             adv_obs_eps = self._normalize_obs(self.adv_observations_eps[adv_batch_inds, adv_env_indices, :], env)
             adv_is_per = np.ones_like(adv_dones, dtype=bool)
-        else:  # 如果没有对抗样本，创建空数组
-            adv_obs, adv_next_obs, adv_actions, adv_dones, adv_rewards, adv_obs_eps, adv_is_per = [np.array([]) for _ in
-                                                                                                   range(7)]
+        else:
+            # --- 核心修改点 2 ---
+            # 如果没有对抗样本，创建正确维度的空数组
+            adv_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            adv_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            adv_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
+            adv_dones = np.zeros((0, 1), dtype=np.float32)
+            adv_rewards = np.zeros((0, 1), dtype=np.float32)
+            adv_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+            adv_is_per = np.zeros((0, 1), dtype=bool)
 
         # --- 合并正常和对抗数据 ---
-        # 如果数组为空，需要重塑以允许拼接
-        def _reshape_if_empty(arr, template_arr):
-            if arr.shape[0] == 0:
-                return arr.reshape(0, *template_arr.shape[1:])
-            return arr
-
+        # 现在两个数组要么都是二维，要么一个是二维另一个是(0, dim)的二维空数组，可以安全拼接
         obs = np.concatenate((normal_obs, adv_obs), axis=0)
-        next_obs = np.concatenate((_reshape_if_empty(normal_next_obs, obs), _reshape_if_empty(adv_next_obs, obs)),
-                                  axis=0)
-        actions = np.concatenate(
-            (_reshape_if_empty(normal_actions, self.actions), _reshape_if_empty(adv_actions, self.actions)), axis=0)
+        next_obs = np.concatenate((normal_next_obs, adv_next_obs), axis=0)
+        actions = np.concatenate((normal_actions, adv_actions), axis=0)
         dones = np.concatenate((normal_dones, adv_dones), axis=0)
         rewards = np.concatenate((normal_rewards, adv_rewards), axis=0)
-        obs_eps = np.concatenate((_reshape_if_empty(normal_obs_eps, obs), _reshape_if_empty(adv_obs_eps, obs)), axis=0)
+        obs_eps = np.concatenate((normal_obs_eps, adv_obs_eps), axis=0)
         obs_is_per = np.concatenate((normal_is_per, adv_is_per), axis=0)
 
         # --- 创建并返回 ReplayBufferSamples 对象 ---
         data = (obs, actions, next_obs, dones, rewards, obs_eps, obs_is_per)
 
         samples_tuple = tuple(map(self.to_torch, data))
-
         return ReplayBufferSamples(*samples_tuple)
 
 
