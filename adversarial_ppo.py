@@ -83,16 +83,6 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
     def _setup_model(self):
         super()._setup_model()
         # Use the custom rollout buffer if provided, otherwise, use the default one
-        if self.rollout_buffer_class is not None:
-            self.rollout_buffer = self.rollout_buffer_class(
-                self.n_steps,
-                self.observation_space,
-                self.action_space,
-                self.device,
-                self.gamma,
-                self.gae_lambda,
-                self.n_envs
-            )
 
 
 class AdversarialDecouplePPO(AdversarialPPO):
@@ -116,16 +106,6 @@ class AdversarialDecouplePPO(AdversarialPPO):
     def _setup_model(self):
         super()._setup_model()
         # Use the custom rollout buffer if provided, otherwise, use the default one
-        if self.rollout_buffer_class is not None:
-            self.rollout_buffer = self.rollout_buffer_class(
-                self.n_steps,
-                self.observation_space,
-                self.action_space,
-                self.device,
-                self.gamma,
-                self.gae_lambda,
-                self.n_envs
-            )
 
     def train(self):
         """

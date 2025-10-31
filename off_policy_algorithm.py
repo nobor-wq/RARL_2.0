@@ -71,14 +71,14 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
         """
         # Select action randomly or according to policy
         # 2025-10-06 wq flag判断下面的if else
-        flag = 0
+
         state_eps = None
-        adv_action_mask = 0
+        adv_action_mask = False
 
         if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample() for _ in range(n_envs)])
-            flag = 1
+
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
@@ -111,7 +111,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 actions_tensor = th.tensor(actions, device=self.device)
 
                 # infos 可能是 dict 或 list
-                print("DEBUG infos: ", self._last_infos)
                 if isinstance(self._last_infos, dict):
                     info0 = self._last_infos
                 elif isinstance(self._last_infos, (list, tuple)) and len(self._last_infos) > 0:
@@ -119,7 +118,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 else:
                     raise ValueError(f"Invalid infos format: {type(self._last_infos)}")
                 # 如果没有 attReStep 键则报错
-                print("DEBUG info0: ", info0)
                 if 'attReStep' not in info0:
                     raise KeyError(f"'attReStep' key not found in info: {info0}")
                 attReStep = float(info0['attReStep'])
@@ -128,7 +126,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
                 obs_adv = th.cat([obs_tensor, attReStep_tensor, actions_tensor], dim=-1)  # -> (batch, 28)
                 # obs_tensor[:, -1] = actions_tensor.squeeze(-1)
-                adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=True)
+                adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=False)
 
             adv_action_mask = (adv_action[:, 0] > 0) & (obs_adv[:, -2].cpu().numpy() > 0)
             if adv_action_mask:
@@ -163,10 +161,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
             self.logger.record("def_action_record/action_adv", adv_action_eps.item())
             self.logger.record("def_action_record/action_def_new", buffer_action.item())
 
-        if not flag:
-            return adv_action_mask, buffer_action, state_eps
-        else:
-            return adv_action_mask, buffer_action, state_eps
+        return adv_action_mask, buffer_action, state_eps
 
 
     def _store_transition(
@@ -222,8 +217,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                     if self._vec_normalize_env is not None:
                         next_obs[i] = self._vec_normalize_env.unnormalize_obs(next_obs[i, :])
 
-
-        # print("DEBUG mask: ", obs_is_per, " obs_eps: ", obs_eps)
         replay_buffer.add(
             self._last_original_obs,  # type: ignore[arg-type]
             next_obs,  # type: ignore[arg-type]
@@ -293,9 +286,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
             # Select action randomly or according to policy
             adv_action_mask, buffer_actions, obs_eps = self._sample_action(learning_starts, action_noise, env.num_envs)
-
-            # print("DEBUG adv_action_mask: ", adv_action_mask, " obs_eps: ", obs_eps)
-
             # Rescale and perform action
             env.set_attr('adv_action_mask', adv_action_mask)
             new_obs, rewards, dones, infos = env.step(buffer_actions)

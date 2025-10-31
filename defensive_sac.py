@@ -77,16 +77,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
     # 2025-09-23 wq 修改缓冲区
     def _setup_model(self):
         super()._setup_model()
-        # Use the custom rollout buffer if provided, otherwise, use the default one
-        if self.replay_buffer_class is not None:
-            self.replay_buffer = self.replay_buffer_class(
-                self.buffer_size,
-                self.observation_space,
-                self.action_space,
-                self.device,
-                self.n_envs,
-                self.optimize_memory_usage,
-            )
+
 
     # 2025-09-23 wq 训练
     def train(self, gradient_steps: int, batch_size: int = 64) -> None:
@@ -110,9 +101,6 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
             obs = replay_data.observations  # th.Tensor, shape (B, ...)
             obs_eps = replay_data.observations_eps
             obs_is_per = replay_data.obs_is_perturbed
-
-            # print("DEBUG obs_eps: ", obs_eps, " shape: ", obs_eps.shape)
-            # print("DEBUG obs_is_per: ", obs_is_per, " shape: ", obs_is_per.shape)
 
             obs_used = th.where(obs_is_per, obs_eps, obs)
 
@@ -255,9 +243,9 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
 
                         # 步骤 5: 添加到总损失
                         actor_loss = actor_loss_policy + self.kl_coef * kl_loss_masked
-                        print("DEBUG actor_loss_policy: ", actor_loss_policy)
-                        print("DEBUG self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
-                        print("DEBUG actor_loss: ", actor_loss)
+                        print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy)
+                        print("DEBUG defensive_sac.py train self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
+                        print("DEBUG defensive_sac.py train actor_loss: ", actor_loss)
 
                         self.logger.record("train_def/self.kl_coef_kl_loss_masked", (self.kl_coef * kl_loss_masked).item())
                     else:
@@ -265,27 +253,27 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                             actions_clean_np, _states = self.trained_expert.predict(obs.cpu(), deterministic=True)
                         actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                         per_elem_sq = (actions_clean - actions_pi) ** 2
-                        print("DEBUG per_elem_sq: ", per_elem_sq, " shape: ", per_elem_sq.shape)
+                        print("DEBUG defensive_sac.py train per_elem_sq: ", per_elem_sq, " shape: ", per_elem_sq.shape)
                         per_sample_mse = per_elem_sq.mean(dim=1)
-                        print("DEBUG per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
+                        print("DEBUG defensive_sac.py train per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
                         mask = obs_is_per.to(device=per_sample_mse.device)
-                        print("DEBUG mask: ", mask, "shape: ", mask.shape)
+                        print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
                         if mask.dtype.is_floating_point:
                             mask = mask > 0.5
                         else:
                             mask = mask.bool()
                         mask = mask.view(-1)
-                        print("DEBUG mask_1: ", mask, "shape_1: ", mask.shape)
+                        print("DEBUG defensive_sac.py train mask_1: ", mask, "shape_1: ", mask.shape)
                         # apply mask: false -> zero loss, true -> keep per-sample mse
                         mask_float = mask.to(dtype=per_sample_mse.dtype)
-                        print("DEBUG mask_float: ", mask_float, " shape: ", mask_float.shape)
+                        print("DEBUG defensive_sac.py train mask_float: ", mask_float, " shape: ", mask_float.shape)
                         masked_per_sample = per_sample_mse * mask_float  # (B,)
-                        print("DEBUG masked_per_sample: ", masked_per_sample, " shape: ", masked_per_sample.shape)
+                        print("DEBUG defensive_sac.py train masked_per_sample: ", masked_per_sample, " shape: ", masked_per_sample.shape)
                         action_loss_masked = masked_per_sample.mean()
-                        print("DEBUG action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
+                        print("DEBUG defensive_sac.py train action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
                         actor_loss = actor_loss_policy + action_loss_masked * 10
-                        print("DEBUG actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
-                        print("DEBUG actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
+                        print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
+                        print("DEBUG defensive_sac.py train actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
                         self.logger.record("train_def/action_loss_masked_10", (action_loss_masked * 10).item())
 
                 else:

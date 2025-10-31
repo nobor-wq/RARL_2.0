@@ -131,14 +131,15 @@ class DualReplayBufferDefender(ReplayBuffer):
             action_space: spaces.Space,
             device: Union[th.device, str],
             n_envs: int = 1,
-            adv_sample_ratio: float = 0.5,  # 新增参数，用于控制采样比例
             optimize_memory_usage: bool = False,
+            adv_sample_ratio: float = 0.5,  # 新增参数，用于控制采样比例
             handle_timeout_termination: bool = True,
     ):
         # 调用父类的构造函数，但我们会重写大部分属性
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
 
         # --- 核心改动：为正常和对抗数据分割缓冲区大小 ---
+
         self.adv_sample_ratio = adv_sample_ratio
         adv_buffer_size = int(buffer_size * adv_sample_ratio)
         normal_buffer_size = buffer_size - adv_buffer_size
@@ -233,6 +234,7 @@ class DualReplayBufferDefender(ReplayBuffer):
             if self.adv_pos == self.adv_buffer_size:
                 self.adv_full = True
                 self.adv_pos = 0
+            print("DEBUG buffer.py add: adv_pos =", self.adv_pos)
         else:
             # 添加到正常缓冲区
             self.normal_observations[self.normal_pos] = np.array(obs)
@@ -253,6 +255,7 @@ class DualReplayBufferDefender(ReplayBuffer):
             if self.normal_pos == self.normal_buffer_size:
                 self.normal_full = True
                 self.normal_pos = 0
+            print("DEBUG buffer.py add: normal_pos =", self.normal_pos)
 
     def sample(self, batch_size: int, env=None) -> ReplayBufferSamples:
         """
