@@ -49,6 +49,8 @@ if args.attack:
     else:#str(args.train_eps)
         advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), str(args.trained_step), 'lunar')
     # 加载训练好的攻击者模型
+    print("DEBUG adv model path: ", advmodel_path)
+
     if args.algo_adv == 'SAC':
         model = SAC.load(advmodel_path, device=device)
     elif args.algo_adv == 'PPO':
@@ -95,6 +97,8 @@ elif args.algo == "RARL":
         model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
     else:
         model_path = os.path.join(defense_model_path, 'lunar')
+
+    print("DEBUG def model path: ", model_path)
     trained_agent = SAC.load(model_path, device=device)
 
 

@@ -13,7 +13,7 @@ def get_config():
     parser.add_argument('--algo_adv', default="PPO", help='training adv algorithm')
     parser.add_argument('--path_def', default="./logs/eval_def/", help='path of the trained model')
     parser.add_argument('--path_adv', default="./logs/eval_adv/", help='path of the trained model')
-    parser.add_argument('--adv_steps', type=int, default=4, help='number of adversarial attack steps')
+    parser.add_argument('--adv_steps', type=int, default=6, help='number of adversarial attack steps')
     parser.add_argument('--train_step', type=int, default=600, help='number of training episodes')
     parser.add_argument('--loop_nums', type=int, default=30, help='number of training episodes')
 
@@ -90,6 +90,8 @@ def get_config():
     parser.add_argument('--use_kl', action='store_true', help='whether to use expert')
     parser.add_argument('--kl_coef', type=float, default=0.02, help='epsilon-ball around init state')
     parser.add_argument('--model_name', default="defender_v258_20250806_1056_4_5_005", help='训练IGCARL攻击者时使用的防御者模型')
+    parser.add_argument("--trained_step", type=int, default=80, help="Duration of each frame")
+
 
 
     return parser

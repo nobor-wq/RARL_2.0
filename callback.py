@@ -130,11 +130,11 @@ class CustomEvalCallback_adv(EvalCallback):
             self.logger.record("eval_adv/attack_count", attack_count)
             self.logger.record("eval_adv/attack_success", attack_success)
 
-            if len(self._is_success_buffer) > 0:
-                success_rate = np.mean(self._is_success_buffer)
-                if self.verbose >= 1:
-                    print(f"Success rate: {100 * success_rate:.2f}%")
-                self.logger.record("eval_adv/success_rate", success_rate)
+            # if len(self._is_success_buffer) > 0:
+            #     success_rate = np.mean(self._is_success_buffer)
+            #     if self.verbose >= 1:
+            #         print(f"Success rate: {100 * success_rate:.2f}%")
+            #     self.logger.record("eval_adv/success_rate", success_rate)
 
             # Dump log so the evaluation results are printed with the correct timestep
             self.logger.record("time_adv/total_timesteps", self.num_timesteps, exclude="tensorboard")
@@ -284,11 +284,11 @@ class CustomEvalCallback_def(EvalCallback):
             self.logger.record("eval_def/attack_count", attack_count)
             self.logger.record("eval_def/attack_success", attack_success)
 
-            if len(self._is_success_buffer) > 0:
-                success_rate = np.mean(self._is_success_buffer)
-                if self.verbose >= 1:
-                    print(f"Success rate: {100 * success_rate:.2f}%")
-                self.logger.record("eval_def/success_rate", success_rate)
+            # if len(self._is_success_buffer) > 0:
+            #     success_rate = np.mean(self._is_success_buffer)
+            #     if self.verbose >= 1:
+            #         print(f"Success rate: {100 * success_rate:.2f}%")
+            #     self.logger.record("eval_def/success_rate", success_rate)
 
             # Dump log so the evaluation results are printed with the correct timestep
             self.logger.record("time_def/total_timesteps", self.num_timesteps, exclude="tensorboard")

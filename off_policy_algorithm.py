@@ -139,6 +139,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 if isinstance(state_eps, th.Tensor):
                     state_eps = state_eps.detach().cpu().numpy()
                 unscaled_action, _ = self.predict(state_eps, deterministic=False)
+
             else:
                 unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
 
@@ -157,6 +158,11 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
             # Discrete case, no need to normalize or clip
             buffer_action = unscaled_action
             action = buffer_action
+        if adv_action_mask:
+            self.logger.record("def_action_record/action_def_old", actions_tensor.item())
+            self.logger.record("def_action_record/action_adv", adv_action_eps.item())
+            self.logger.record("def_action_record/action_def_new", buffer_action.item())
+
         if not flag:
             return adv_action_mask, buffer_action, state_eps
         else:

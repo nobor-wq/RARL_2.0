@@ -97,12 +97,14 @@ def evaluate_policy_adv(
                 if adv_action_mask:
                     attack_success_count += 1
                     print("DEBUG attack success: ", attack_success_count)
+                if info0.get('TimeLimit.truncated', False):
+                    # 如果这是一个纯粹的超时，我们再检查位置是否正确。
+                    if xa is not None and ya is not None and (xa < -50.0 and ya > 4.0):
+                        success_count += 1
+                        print(f"DEBUG success on episode {i}: Reached step limit at correct position.")
+
                 break
             observations = new_observations
-        if xa is not None and ya is not None:
-            if xa < -50.0 and ya > 4.0 and not dones:  # 还没结束时达成目标
-                success_count += 1
-                print("DEBUG success: ", success_count)
 
             # if render:
             #     env.render()
@@ -119,7 +121,6 @@ def evaluate_policy_adv(
     # if return_episode_rewards:
     return mean_reward, mean_length, success_rate, mean_attack, mean_attack_success
 
-        # return mean_reward, std_reward
 
 
 def evaluate_policy_def(
@@ -250,15 +251,15 @@ def evaluate_policy_def(
                 if adv_action_mask:
                     attack_success_count += 1
                     print("DEBUG attack success: ", attack_success_count)
+                if info1.get('TimeLimit.truncated', False):
+                    # 如果这是一个纯粹的超时，我们再检查位置是否正确。
+                    if xa is not None and ya is not None and (xa < -50.0 and ya > 4.0):
+                        success_count += 1
+                        print(f"DEBUG success on episode {i}: Reached step limit at correct position.")
+
                 break
 
             observations = new_observations
-
-
-        if xa is not None and ya is not None:
-            if xa < -50.0 and ya > 4.0 and not dones:  # 还没结束时达成目标
-                success_count += 1
-                print("DEBUG success: ", success_count)
 
             # if render:
             #     env.render()

@@ -78,6 +78,10 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
             else:
                 adv_action_mask = (clipped_adv_actions[:, 0] > 0) & (obs_tensor[:, -2].cpu().numpy() > 0)
 
+
+            if adv_action_mask:
+                self.logger.record("adv_action_record/action_def_old", actions_tensor.item())
+
             # Generate perturbation into observations to get adv_obs
             final_actions = self.attack_process(obs_tensor, adv_action_mask, clipped_adv_actions, actions)
 
@@ -222,6 +226,8 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
                 else:
                     adv_action_fromState, _ = self.trained_agent.predict(adv_state.cpu(), deterministic=True)
                     adv_action = adv_action_fromState
+            self.logger.record("adv_action_record/action_adv", selected_adv_actions.item())
+            self.logger.record("adv_action_record/action_def_new", adv_action_fromState.item())
             # print('clip',clipped_adv_actions,'adv_actions:', adv_actions, 'adv_final_action', action, 'actions:', actions, 'remain attack times ', obs_tensor[:, -2].cpu().numpy())
             final_action = actions.copy()
             final_action[attack_idx] = adv_action

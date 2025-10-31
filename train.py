@@ -110,14 +110,15 @@ def main():
     parser = get_config()
     args = parser.parse_args()
 
-
+    if args.use_kl:
+        args.addition_msg = "kl"
     # defenfer and attacker log path
-    eval_def_log_path = os.path.join(args.path_def, args.algo, args.env_name, str(args.attack_eps), str(args.seed), args.addition_msg)
+    eval_def_log_path = os.path.join(args.path_def, args.algo, args.env_name, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
     os.makedirs(eval_def_log_path, exist_ok=True)
     best_model_path_def = os.path.join(eval_def_log_path, "best_model")
     eval_best_model_path_def = os.path.join(eval_def_log_path, "eval_best_model")
 
-    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, args.algo, str(args.attack_eps), str(args.seed), args.addition_msg)
+    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, args.addition_msg, args.algo, str(args.attack_eps), str(args.seed), str(args.train_step))
     os.makedirs(eval_adv_log_path, exist_ok=True)
     best_model_path_adv = os.path.join(eval_adv_log_path, "best_model")
     eval_best_model_path_adv = os.path.join(eval_adv_log_path, "eval_best_model")
@@ -194,9 +195,10 @@ def main():
             msg_parts.append("expert")
             if args.use_kl:
                 msg_parts.append("kl")
-        args.addition_msg = "_".join(msg_parts)
 
-        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}-{args.train_step}"
+        swanlab_name = "_".join(msg_parts)
+
+        run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{swanlab_name}-{args.train_step}"
         run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
         callbacks_common.append(swan_cb)
@@ -320,7 +322,7 @@ def main():
                                                    eval_freq=args.n_steps * 10,
                                                    unlimited_attack=args.unlimited_attack,
                                                    attack_method=args.attack_method)
-        model_adv_last.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+        model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
                         callback=[checkpoint_callback_adv, eval_callback_adv_last] + callbacks_common,
                         trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
 

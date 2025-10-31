@@ -217,7 +217,6 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
 
             if self.action_diff:
                 if self.use_expert:
-
                     if self.kl_div:
                         # --- 核心修改开始 ---
                         # 步骤 1: 获取专家在“干净”状态下的策略分布
@@ -260,7 +259,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         print("DEBUG self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
                         print("DEBUG actor_loss: ", actor_loss)
 
-                        self.logger.record("train_def/kl_loss", kl_loss_masked.item())
+                        self.logger.record("train_def/self.kl_coef_kl_loss_masked", (self.kl_coef * kl_loss_masked).item())
                     else:
                         with th.no_grad():
                             actions_clean_np, _states = self.trained_expert.predict(obs.cpu(), deterministic=True)
@@ -287,6 +286,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         actor_loss = actor_loss_policy + action_loss_masked * 10
                         print("DEBUG actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
                         print("DEBUG actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
+                        self.logger.record("train_def/action_loss_masked_10", (action_loss_masked * 10).item())
+
                 else:
                     with th.no_grad():
                         actions_clean_np, _states = self.trained_agent.predict(obs.cpu(), deterministic=True)
