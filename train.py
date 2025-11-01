@@ -106,12 +106,14 @@ def main():
     msg_parts = []
     if args.action_diff:
         msg_parts.append("action_diff")
-    if args.use_expert:
-        msg_parts.append("expert")
+        if args.use_expert:
+            msg_parts.append("expert")
         # 依赖于 expert 的技术，可以进行嵌套
         if args.use_kl:
             msg_parts.append("kl")
-    # 新增的 Buffer 技术
+        elif args.use_lagrangian:
+            msg_parts.append("lag")
+        # 新增的 Buffer 技术
     if args.use_DualBuffer:
         msg_parts.append("DualBuffer")
     if not msg_parts:
@@ -130,7 +132,7 @@ def main():
     best_model_path_def = os.path.join(eval_def_log_path, "best_model")
     eval_best_model_path_def = os.path.join(eval_def_log_path, "eval_best_model")
 
-    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name,  args.algo, args.addition_msg,str(args.attack_eps), str(args.seed), str(args.train_step))
+    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name,  args.algo, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
     os.makedirs(eval_adv_log_path, exist_ok=True)
     best_model_path_adv = os.path.join(eval_adv_log_path, "best_model")
     eval_best_model_path_adv = os.path.join(eval_adv_log_path, "eval_best_model")

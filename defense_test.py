@@ -40,14 +40,35 @@ env = gym.make(args.env_name, attack=args.attack, adv_steps=args.adv_steps, eval
                render_mode=args.render_mode)
 env.unwrapped.start()
 
+msg_parts = []
+if args.action_diff:
+    msg_parts.append("action_diff")
+    if args.use_expert:
+        msg_parts.append("expert")
+    # 依赖于 expert 的技术，可以进行嵌套
+    if args.use_kl:
+        msg_parts.append("kl")
+    elif args.use_lagrangian:
+        msg_parts.append("lag")
+# 新增的 Buffer 技术
+if args.use_DualBuffer:
+    msg_parts.append("DualBuffer")
+if not msg_parts:
+    # 如果没有任何特殊技术，就是一个基础版本
+    addition_msg = "base"
+else:
+    addition_msg = "_".join(msg_parts)
+
+
+
 if args.attack:
     if args.best_model:
         if args.eval_best_model:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), str(args.trained_step), 'eval_best_model/best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'eval_best_model/best_model')
         else:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo,str(args.train_eps) , str(args.seed), str(args.trained_step), 'best_model')
+            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'best_model')
     else:#str(args.train_eps)
-        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, str(args.train_eps) , str(args.seed), str(args.trained_step), 'lunar')
+        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'lunar')
     # 加载训练好的攻击者模型
     print("DEBUG adv model path: ", advmodel_path)
 
@@ -90,19 +111,16 @@ if args.algo == "IGCARL":
     trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
     trained_agent.eval()
 elif args.algo == "RARL":
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name,  str(args.train_eps), str(args.seed), str(args.trained_step))
+
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps), str(args.seed), str(args.trained_step))
     if args.best_model:
         model_path = os.path.join(defense_model_path, 'best_model')
     elif args.eval_best_model:
         model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
     else:
         model_path = os.path.join(defense_model_path, 'lunar')
-
     print("DEBUG def model path: ", model_path)
     trained_agent = SAC.load(model_path, device=device)
-
-
-
 
 # 进行验证
 rewards = []
@@ -181,6 +199,7 @@ for episode in range(args.train_step):
 
             r_def = float(info0['reward'])
             c_def = float(info0['cost'])
+            episode_reward += r_def - c_def
             print('step ', episode_steps, 'reward is ', r_def-c_def)
 
 
@@ -194,9 +213,9 @@ for episode in range(args.train_step):
             else:
                 actions,_ = trained_agent.predict(obs, deterministic=True)
             obs, reward, done, terminate, info = env.step(actions)
-
+            episode_reward += reward
             print('step ', episode_steps, 'reward is ', reward)
-        episode_reward += reward
+
         episode_steps += 1
 
 

@@ -126,7 +126,8 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
                 obs_adv = th.cat([obs_tensor, attReStep_tensor, actions_tensor], dim=-1)  # -> (batch, 28)
                 # obs_tensor[:, -1] = actions_tensor.squeeze(-1)
-                adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=False)
+                # TODO:这里是否固定攻击者动作的输出
+                adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=True)
 
             adv_action_mask = (adv_action[:, 0] > 0) & (obs_adv[:, -2].cpu().numpy() > 0)
             if adv_action_mask:
@@ -336,7 +337,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
 class OffPolicyBaseAlgorithm(OffPolicyAlgorithm):
 
-    # TODO:这里需要重写一下父文件的_dump_logs
     def _dump_logs(self):
         assert self.ep_info_buffer is not None
         assert self.ep_success_buffer is not None

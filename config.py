@@ -93,6 +93,9 @@ def get_config():
     parser.add_argument("--trained_step", type=int, default=80, help="Duration of each frame")
     parser.add_argument('--adv_sample_ratio', type=float, default=0.5, help='epsilon-ball around init state')
     parser.add_argument('--use_DualBuffer', action='store_true', help='whether to use dual Buffer def')
+    parser.add_argument('--use_lagrangian', action='store_true', help='whether to use dual Buffer def')
+    parser.add_argument('--lagrangian_eps', type=float, default=0.01, help='epsilon-ball around init state')
+    parser.add_argument('--lagrangian-lr', type=float, default=1e-4, help='Learning rate for Lagrangian multiplier')
 
 
 
