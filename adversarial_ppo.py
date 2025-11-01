@@ -80,10 +80,6 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
             progress_bar=progress_bar,
         )
 
-    def _setup_model(self):
-        super()._setup_model()
-        # Use the custom rollout buffer if provided, otherwise, use the default one
-
 
 class AdversarialDecouplePPO(AdversarialPPO):
 
