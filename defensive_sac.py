@@ -253,7 +253,6 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     self.logger.record("train_def/self.kl_coef_kl_loss_masked", (self.kl_coef * kl_loss_masked).item())
                 elif self.use_lagrangian:
                     # 步骤 1: 计算“安全”动作 (在干净状态 obs 下的动作)
-                    # 我们不希望梯度流向这个目标，所以使用 no_grad
                     with th.no_grad():
                         # 使用 action_log_prob 获取采样动作，与 actions_pi 保持一致
                         actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
@@ -262,6 +261,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     # actions_pi 是在扰动状态 obs_used 下的动作
                     policy_loss_per_sample = F.mse_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
 
+                    print(f"\n{'=' * 20} DEBUG START {'=' * 20}")
+                    print("DEBUG defensive_sac.py train policy_loss_per_sample: ", policy_loss_per_sample, " shape: ", policy_loss_per_sample.shape)
                     # 步骤 3: 准备拉格朗日乘子
                     # 我们在 actor loss 中使用 lambda 的值，但不通过 actor loss 更新 lambda
                     lam2 = self.log_lam2.exp().detach()
@@ -269,8 +270,10 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     # 步骤 4: 计算 Actor Loss (Primal Objective)
                     # 只对被扰动的样本施加约束
                     mask = obs_is_per.view(-1)
+                    print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
                     # 将 policy_loss 应用于被扰动的样本，未扰动的损失为0
                     masked_policy_loss = policy_loss_per_sample[mask]
+                    print("DEBUG defensive_sac.py train masked_policy_loss: ", masked_policy_loss, " shape: ", masked_policy_loss.shape)
 
                     self.logger.record("train_def/masked_policy_loss", masked_policy_loss.mean().item())
 
@@ -280,6 +283,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     lagrangian_penalty = th.tensor(0.0, device=self.device)
                     if masked_policy_loss.numel() > 0:
                         lagrangian_penalty = (lam2 * masked_policy_loss).mean()
+                        print("DEBUG defensive_sac.py train lagrangian_penalty: ", lagrangian_penalty, " shape: ", lagrangian_penalty.shape)
 
                     actor_loss = actor_loss_policy + lagrangian_penalty
 
@@ -297,11 +301,12 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         masked_violation = constraint_violation[mask]
                     if masked_violation.numel() > 0:
                         # 最小化 -log(lambda) * g，等价于最大化 log(lambda) * g
-                        lambda_loss = -(self.log_lam2 * masked_violation).mean()
+                        lambda_loss = -(self.log_lam2 * masked_violation.detach()).mean()
 
                         self.lam2_optimizer.zero_grad()
                         lambda_loss.backward()
                         self.lam2_optimizer.step()
+                        self.log_lam2.data.clamp_(-5, 10)  # 裁剪 log-lambda 的值
                         self.logger.record("train_def/constraint_violation",
                                            masked_violation.mean().item())
                     else:
