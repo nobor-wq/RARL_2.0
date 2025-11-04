@@ -20,12 +20,12 @@ from policy import IGCARLNet
 from stable_baselines3.common.utils import obs_as_tensor
 from fgsm import FGSM_v2
 
-def final_evaluation(args, final_defender, final_attacker, device):
+def final_evaluation(args, final_defender, final_attacker, device, attack):
     """
     在整个训练流程结束后，对最终的防御者和攻击者进行一次独立的评估。
     模仿 defense_test.py 的逻辑。
     """
-    print("\n--- Starting Final Evaluation ---")
+    print("\n--- Starting Evaluation ---")
 
     np.random.seed(args.seed + 100)  # 设置 NumPy 随机种子
     th.manual_seed(args.seed + 100)  # 设置 CPU 随机种子
@@ -38,18 +38,18 @@ def final_evaluation(args, final_defender, final_attacker, device):
     # 设置eval标志
     args.eval = True
     # 创建环境
-    eval_env = gym.make(args.env_name, attack=True, adv_steps=args.adv_steps, eval=args.eval, use_gui=args.use_gui,
+    eval_env = gym.make(args.env_name, attack=attack, adv_steps=args.adv_steps, eval=args.eval, use_gui=args.use_gui,
                    render_mode=args.render_mode)
     eval_env.unwrapped.start()
-    # 2. 准备模型 (它们已经从参数传入)
-    # 确保模型处于评估模式
-    final_defender.policy.set_training_mode(False)
-    final_attacker.policy.set_training_mode(False)
 
     # 3. 循环评估
     rewards = []
-    num_eval_episodes = 500  # 可以设一个比训练中评估更精确的次数
+    num_eval_episodes = 200
     sn = 0
+    # 2025-11-04 wq 成功率，奖励，攻击成功率，平均攻击次数
+    attack_sn = 0
+    total_attack_times = 0
+
 
     for _ in range(num_eval_episodes):
         obs, _ = eval_env.reset(options="random")
@@ -58,61 +58,87 @@ def final_evaluation(args, final_defender, final_attacker, device):
             # --- 这部分逻辑完全来自于你的 defense_test.py ---
             obs_tensor = obs_as_tensor(obs, device)
 
-            # 防御者生成原始动作
-            with th.no_grad():
-                actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
-            actions_tensor = th.tensor(actions, device=obs_tensor.device)  # 确保在同一设备上
-            obs_tensor[-1] = actions_tensor
-            # 攻击者生成攻击动作
-            with th.no_grad():
-                adv_actions, _ = final_attacker.predict(obs_tensor.cpu(), deterministic=True)
+            if attack:
+                # 防御者生成原始动作
+                with th.no_grad():
+                    actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
+                actions_tensor = th.tensor(actions, device=obs_tensor.device)  # 确保在同一设备上
+                obs_tensor[-1] = actions_tensor
+                # 攻击者生成攻击动作
+                with th.no_grad():
+                    adv_actions, _ = final_attacker.predict(obs_tensor.cpu(), deterministic=True)
 
-            adv_action_mask = (adv_actions[0] > 0) & (obs[-2] > 0)
-            # print("DEBUG train.py adv_action_mask:", adv_action_mask, "adv_actions:", adv_actions, "obs[-2]:", obs[-2])
+                adv_action_mask = (adv_actions[0] > 0) & (obs[-2] > 0)
+                # print("DEBUG train.py adv_action_mask:", adv_action_mask, "adv_actions:", adv_actions, "obs[-2]:", obs[-2])
 
-            if adv_action_mask.any():
-                adv_state = FGSM_v2(adv_actions[1], victim_agent=final_defender,
-                                    last_state=obs_tensor[:-2].unsqueeze(0), epsilon=args.attack_eps, device=device)
-                action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
-                final_action = action_perturbed
-                print("DEBUG train.py action before attack:", actions, "attack action is: ", adv_actions, "after attack:", final_action)
+                if adv_action_mask.any():
+                    adv_state = FGSM_v2(adv_actions[1], victim_agent=final_defender,
+                                        last_state=obs_tensor[:-2].unsqueeze(0), epsilon=args.attack_eps, device=device)
+                    action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
+                    final_action = action_perturbed
+                    total_attack_times += 1
+                    swanlab.log({"Eval/agent action before:": actions.item()})
+                    swanlab.log({"Eval/agent adv action:": adv_actions[1].item()})
+                    swanlab.log({"Eval/agent action after attack:": final_action.item()})
+
+                    print("DEBUG train.py action before attack:", actions, "attack action is: ", adv_actions, "after attack:", final_action)
+                else:
+                    final_action = actions
+
+                # 组合最终动作并与环境交互
+                action = np.column_stack((final_action, adv_action_mask))
+                obs, reward, done, terminate, info = eval_env.step(action)
+
+                if adv_action_mask.any() and done is True:
+                    attack_sn += 1
+
+                # if isinstance(info, dict):
+                #     info0 = info
+                # elif isinstance(info, (list, tuple)) and len(info) > 0:
+                #     info0 = info[0]
+                # else:
+                #     raise ValueError(f"Invalid infos format: {type(info)}")
+                # if 'reward' not in info0:
+                #     raise KeyError(f"'reward' key not found in info: {info0}")
+                r_def = float(info['reward'])
+                c_def = float(info['cost'])
+                episode_reward += r_def - c_def
             else:
-                final_action = actions
-
-            # 组合最终动作并与环境交互
-            action = np.column_stack((final_action, adv_action_mask))
-            obs, reward, done, terminate, info = eval_env.step(action)
-
-            if isinstance(info, dict):
-                info0 = info
-            elif isinstance(info, (list, tuple)) and len(info) > 0:
-                info0 = info[0]
-            else:
-                raise ValueError(f"Invalid infos format: {type(info)}")
-            if 'reward' not in info0:
-                raise KeyError(f"'reward' key not found in info: {info0}")
-
-            r_def = float(info0['reward'])
-            c_def = float(info0['cost'])
-            episode_reward += r_def - c_def
-
-            xa = info['x_position']
-            ya = info['y_position']
-
+                with th.no_grad():
+                    actions, _ = final_defender.predict(obs_tensor.cpu(), deterministic=True)
+                obs, reward, done, terminate, info = eval_env.step(actions)
+                episode_reward += reward
             if done:
                 break
+
+        xa = info['x_position']
+        ya = info['y_position']
+
         if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv6-v0':
             if xa < -50.0 and ya > 4.0 and done is False:
                 sn += 1
-
         rewards.append(episode_reward)
-
     eval_env.close()
 
     mean_reward = np.mean(rewards)
     mean_success = sn / num_eval_episodes
-    print(f"--- Final Evaluation Result: Mean Reward = {mean_reward:.2f} ---")
-    print(f"--- Final Evaluation Result: Success Rate = {mean_success:.2f} ---\n")
+    if attack:
+        swanlab.log({"Eval/With_Attacker_Mean_Reward": mean_reward})
+        swanlab.log({"Eval/With_Attacker_Success_Rate": mean_success})
+        mean_attack_success = attack_sn / num_eval_episodes
+        mean_attack_times = total_attack_times / num_eval_episodes
+        swanlab.log({"Eval/Attack_Success_Rate": mean_attack_success})
+        swanlab.log({"Eval/Average_Attack_Times": mean_attack_times})
+
+        print(f"--- Final Evaluation Result: Mean Reward = {mean_reward:.2f} ---")
+        print(f"--- Final Evaluation Result: Success Rate = {mean_success:.2f} ---")
+        print(f"--- Final Evaluation Result: Attack Success Rate = {mean_attack_success:.2f} ---")
+        print(f"--- Final Evaluation Result: Average Attack Times = {mean_attack_times:.2f} ---\n")
+    else:
+        swanlab.log({"Eval/No_Attacker_Mean_Reward": mean_reward})
+        swanlab.log({"Eval/No_Attacker_Success_Rate": mean_success})
+        print(f"--- Final Evaluation Result: Mean Reward = {mean_reward:.2f} ---")
+        print(f"--- Final Evaluation Result: Success Rate = {mean_success:.2f} ---\n")
 
     return mean_success
 
@@ -244,6 +270,8 @@ def run_training(args):
     else:
         device = th.device("cpu")
 
+    print("Using device:", device)
+
 
     # 设置随机种子
     random.seed(args.seed)  # 设置 Python 随机种子
@@ -373,41 +401,55 @@ def run_training(args):
 
         print("=== Phase 2: Adversarial Training Loop ===")
         for i in range(args.loop_nums):
-            print(f"--- Loop {i + 1}/{args.loop_nums} ---")
+            env_adv.reset()
+            print(f"--- Loop {i + 1}/{args.loop_nums} --- attacker training ---")
             # 2025-10-26 wq 更新旧防御者用于攻击者训练
             # model_old_def.actor.load_state_dict(model_def.actor.state_dict())
             model_old_def.policy.load_state_dict(model_def.policy.state_dict())
             model_old_def.policy.set_training_mode(False)  # 确保是评估模式
 
-            eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_old_def,
-                                                       attack_eps = args.attack_eps,
-                                                       best_model_save_path=eval_best_model_path_adv,
-                                                       n_eval_episodes=args.n_eval_episodes,
-                                                       eval_freq=args.n_steps * 10,
-                                                       unlimited_attack=args.unlimited_attack,
-                                                       attack_method=args.attack_method)
+            # eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_old_def,
+            #                                            attack_eps = args.attack_eps,
+            #                                            best_model_save_path=eval_best_model_path_adv,
+            #                                            n_eval_episodes=args.n_eval_episodes,
+            #                                            eval_freq=args.n_steps * 10,
+            #                                            unlimited_attack=args.unlimited_attack,
+            #                                            attack_method=args.attack_method)
             #
             model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                            callback=[checkpoint_callback_adv, eval_callback_adv] + callbacks_common,
+                            callback=[checkpoint_callback_adv] + callbacks_common,
                             trained_def=model_old_def,  reset_num_timesteps=False, log_interval = args.print_interval)
+            print(f"--- Loop {i + 1}/{args.loop_nums} --- attacker training over---")
+
+            mean_success = final_evaluation(args, model_def, model_adv, device, attack=False)
+            mean_success = final_evaluation(args, model_def, model_adv, device, attack=True)
+
+            print(f"--- Loop {i + 1}/{args.loop_nums} --- defender training ---")
             # 2025-10-26 wq 更新旧攻击者用于防御者训练
+            env_def.reset()
             model_old_adv.policy.load_state_dict(model_adv.policy.state_dict())
             model_old_adv.policy.set_training_mode(False)
 
-            eval_callback_def = CustomEvalCallback_def(eval_env_adv, trained_agent=model_old_def,
-                                                       trained_adv=model_old_adv,
-                                                       attack_eps=args.attack_eps,
-                                                       best_model_save_path=eval_best_model_path_def,
-                                                       n_eval_episodes=args.n_eval_episodes,
-                                                       eval_freq=args.n_steps * 10,
-                                                       unlimited_attack=args.unlimited_attack,
-                                                       attack_method=args.attack_method)
+            # eval_callback_def = CustomEvalCallback_def(eval_env_adv, trained_agent=model_old_def,
+            #                                            trained_adv=model_old_adv,
+            #                                            attack_eps=args.attack_eps,
+            #                                            best_model_save_path=eval_best_model_path_def,
+            #                                            n_eval_episodes=args.n_eval_episodes,
+            #                                            eval_freq=args.n_steps * 10,
+            #                                            unlimited_attack=args.unlimited_attack,
+            #                                            attack_method=args.attack_method)
 
 
             print("Training Defender...")
             model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                            callback=[checkpoint_callback_def, eval_callback_def] + callbacks_common, trained_agent=model_old_def,
+                            callback=[checkpoint_callback_def] + callbacks_common, trained_agent=model_old_def,
                             trained_adv=model_old_adv, trained_expert=trained_expert, reset_num_timesteps=False, log_interval = args.print_interval)
+            print(f"--- Loop {i + 1}/{args.loop_nums} --- defender training over---")
+
+            mean_success = final_evaluation(args, model_def, model_adv, device, attack=False)
+            mean_success = final_evaluation(args, model_def, model_adv, device, attack=True)
+
+
         # 2025-10-26 wq 最后阶段：攻击测试
         print("=== Phase 3: Final Attack Phase ===")
 
@@ -427,7 +469,9 @@ def run_training(args):
                         callback=[checkpoint_callback_adv, eval_callback_adv_last] + callbacks_common,
                         trained_def=model_old_def, reset_num_timesteps=True, log_interval=args.print_interval)
 
-        # final_mean_reward = final_evaluation(args, model_def, model_adv_last, device)
+        mean_success = final_evaluation(args, model_def, model_adv_last, device, attack=False)
+        final_mean_success = final_evaluation(args, model_def, model_adv_last, device, attack=True)
+
 
         # Save the agent
         eval_env_def.close()
@@ -447,7 +491,7 @@ def run_training(args):
         del model_def
         env_def.close()
 
-        # return final_mean_reward
+        return final_mean_success
 
 def main():
     # get parameters from config.py

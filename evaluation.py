@@ -3,6 +3,7 @@ import torch as th
 from stable_baselines3.common.utils import obs_as_tensor
 from fgsm import FGSM_v2
 from policy import FniNet, IGCARLNet
+from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
 
 

@@ -4,6 +4,7 @@ from evaluation import evaluate_policy_adv, evaluate_policy_def
 import numpy as np
 import os
 import torch as th
+from stable_baselines3.common.monitor import Monitor
 
 class CustomEvalCallback_adv(EvalCallback):
     def __init__(

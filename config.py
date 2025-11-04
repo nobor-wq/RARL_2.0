@@ -28,13 +28,13 @@ def get_config():
     parser.add_argument('--eval', default=False, help='eval flag')
 
     # training parameters
-    parser.add_argument('--use_cuda', default=True, help='Use GPU if available')
+    parser.add_argument('--use_cuda', action='store_true', help='Use GPU if available')
     parser.add_argument('--cuda_number', type=int, default=1, help='CUDA device number to use')
     parser.add_argument('--seed', type=int, default=1, help='random seed for network')
     parser.add_argument('--save_freq', type=int, default=100000, help='frequency of saving the model')
     parser.add_argument('--n_steps', type=int, default=128, help='control n_rollout_steps, for PPO')
-    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lr_def', type=float, default=1e-3, help='learning rate')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+    parser.add_argument('--lr_def', type=float, default=1e-4, help='learning rate')
 
     parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--n_epochs', type=int, default=15, help='number of training epochs')
