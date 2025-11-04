@@ -108,20 +108,284 @@ class DecoupleRolloutBuffer(RolloutBuffer):
         )
         return NewRolloutBufferSamples(*tuple(map(self.to_torch, data)))
 
+#
+# class DualReplayBufferDefender(ReplayBuffer):
+#     """
+#     一个将正常样本和对抗样本分别存储在不同内部缓冲区的Replay Buffer。
+#     这允许进行平衡采样，以防止稀疏的对抗样本被淹没。
+#
+#     :param buffer_size: 缓冲区的总大小。
+#     :param observation_space: 观测空间。
+#     :param action_space: 动作空间。
+#     :param device: 存储数据的设备（CPU或GPU）。
+#     :param n_envs: 并行环境的数量。
+#     :param adv_sample_ratio: 每个批次中期望的对抗样本比例。
+#     :param optimize_memory_usage: 是否优化内存使用。
+#     :param handle_timeout_termination: 是否处理超时终止。
+#     """
+#
+#     def __init__(
+#             self,
+#             buffer_size: int,
+#             observation_space: spaces.Space,
+#             action_space: spaces.Space,
+#             device: Union[th.device, str],
+#             n_envs: int = 1,
+#             optimize_memory_usage: bool = False,
+#             adv_sample_ratio: float = 0.5,  # 新增参数，用于控制采样比例
+#             handle_timeout_termination: bool = True,
+#     ):
+#         # 调用父类的构造函数，但我们会重写大部分属性
+#         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
+#
+#         # --- 核心改动：为正常和对抗数据分割缓冲区大小 ---
+#
+#         self.adv_sample_ratio = adv_sample_ratio
+#         adv_buffer_size = int(buffer_size * adv_sample_ratio)
+#         normal_buffer_size = buffer_size - adv_buffer_size
+#
+#         self.normal_buffer_size = max(normal_buffer_size // n_envs, 1)
+#         self.adv_buffer_size = max(adv_buffer_size // n_envs, 1)
+#
+#         # --- 内存及其他设置（与原始代码类似） ---
+#         if psutil is not None:
+#             mem_available = psutil.virtual_memory().available
+#         if optimize_memory_usage and handle_timeout_termination:
+#             raise ValueError(
+#                 "ReplayBuffer不支持同时设置 optimize_memory_usage = True "
+#                 "和 handle_timeout_termination = True。"
+#             )
+#         self.optimize_memory_usage = optimize_memory_usage
+#         self.handle_timeout_termination = handle_timeout_termination
+#
+#         # --- 为正常样本创建独立的numpy数组 ---
+#         self.normal_observations = np.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
+#                                             dtype=observation_space.dtype)
+#         self.normal_actions = np.zeros((self.normal_buffer_size, self.n_envs, self.action_dim),
+#                                        dtype=self._maybe_cast_dtype(action_space.dtype))
+#         self.normal_rewards = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
+#         self.normal_dones = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
+#         self.normal_timeouts = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
+#         if not optimize_memory_usage:
+#             self.normal_next_observations = np.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
+#                                                      dtype=observation_space.dtype)
+#
+#         # --- 为对抗样本创建独立的numpy数组 ---
+#         self.adv_observations = np.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape),
+#                                          dtype=observation_space.dtype)
+#         self.adv_observations_eps = np.zeros_like(self.adv_observations)  # 对抗缓冲区需要存储扰动后的观测
+#         self.adv_actions = np.zeros((self.adv_buffer_size, self.n_envs, self.action_dim),
+#                                     dtype=self._maybe_cast_dtype(action_space.dtype))
+#         self.adv_rewards = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
+#         self.adv_dones = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
+#         self.adv_timeouts = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
+#         if not optimize_memory_usage:
+#             self.adv_next_observations = np.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape),
+#                                                   dtype=observation_space.dtype)
+#
+#         # --- 为每个缓冲区设置独立的指针和满标志位 ---
+#         self.normal_pos = 0
+#         self.normal_full = False
+#         self.adv_pos = 0
+#         self.adv_full = False
+#
+#         # 注意：不再需要 self.obs_is_perturbed，因为数据存储的位置已经隐含了这个信息。
+#
+#     def add(
+#             self,
+#             obs: np.ndarray,
+#             next_obs: np.ndarray,
+#             action: np.ndarray,
+#             reward: np.ndarray,
+#             done: np.ndarray,
+#             infos: list,
+#             obs_eps: Optional[np.ndarray] = None,
+#             obs_is_per: Union[np.ndarray, bool] = False,
+#     ) -> None:
+#         # 像原始代码一样重塑输入
+#         if isinstance(self.observation_space, spaces.Discrete):
+#             obs = obs.reshape((self.n_envs, *self.obs_shape))
+#             next_obs = next_obs.reshape((self.n_envs, *self.obs_shape))
+#             if obs_eps is not None:
+#                 obs_eps = obs_eps.reshape((self.n_envs, *self.obs_shape))
+#         action = action.reshape((self.n_envs, self.action_dim))
+#
+#         # --- 核心改动：根据标志位将数据路由到正确的缓冲区 ---
+#         if np.any(obs_is_per):  # 如果向量化环境中有任何一个样本被扰动
+#             # 添加到对抗缓冲区
+#             if obs_eps is None:  # 对抗样本理应有obs_eps，这里作为备用
+#                 obs_eps = np.array(obs, copy=True)
+#
+#             self.adv_observations[self.adv_pos] = np.array(obs)
+#             self.adv_observations_eps[self.adv_pos] = np.array(obs_eps)
+#
+#             if self.optimize_memory_usage:
+#                 self.adv_observations[(self.adv_pos + 1) % self.adv_buffer_size] = np.array(next_obs)
+#             else:
+#                 self.adv_next_observations[self.adv_pos] = np.array(next_obs)
+#
+#             self.adv_actions[self.adv_pos] = np.array(action)
+#             self.adv_rewards[self.adv_pos] = np.array(reward)
+#             self.adv_dones[self.adv_pos] = np.array(done)
+#             if self.handle_timeout_termination:
+#                 self.adv_timeouts[self.adv_pos] = np.array([info.get("TimeLimit.truncated", False) for info in infos])
+#
+#             self.adv_pos += 1
+#             if self.adv_pos == self.adv_buffer_size:
+#                 self.adv_full = True
+#                 self.adv_pos = 0
+#             # print("DEBUG buffer.py add: adv_pos =", self.adv_pos)
+#         else:
+#             # 添加到正常缓冲区
+#             self.normal_observations[self.normal_pos] = np.array(obs)
+#
+#             if self.optimize_memory_usage:
+#                 self.normal_observations[(self.normal_pos + 1) % self.normal_buffer_size] = np.array(next_obs)
+#             else:
+#                 self.normal_next_observations[self.normal_pos] = np.array(next_obs)
+#
+#             self.normal_actions[self.normal_pos] = np.array(action)
+#             self.normal_rewards[self.normal_pos] = np.array(reward)
+#             self.normal_dones[self.normal_pos] = np.array(done)
+#             if self.handle_timeout_termination:
+#                 self.normal_timeouts[self.normal_pos] = np.array(
+#                     [info.get("TimeLimit.truncated", False) for info in infos])
+#
+#             self.normal_pos += 1
+#             if self.normal_pos == self.normal_buffer_size:
+#                 self.normal_full = True
+#                 self.normal_pos = 0
+#             # print("DEBUG buffer.py add: normal_pos =", self.normal_pos)
+#     def sample(self, batch_size: int, env=None) -> ReplayBufferSamples:
+#         """
+#         从双重回放缓冲区中采样元素。
+#         """
+#         # --- 核心改动：从两个缓冲区进行平衡采样 ---
+#         adv_samples_to_take = int(batch_size * self.adv_sample_ratio)
+#         normal_samples_to_take = batch_size - adv_samples_to_take
+#
+#         normal_size = self.normal_buffer_size if self.normal_full else self.normal_pos
+#         adv_size = self.adv_buffer_size if self.adv_full else self.adv_pos
+#
+#         # --- 根据可用数据调整采样数量 ---
+#         if adv_size == 0:
+#             # 还没有对抗样本，全部从正常缓冲区采样
+#             normal_samples_to_take = batch_size
+#             adv_samples_to_take = 0
+#         elif adv_size < adv_samples_to_take:
+#             # 对抗样本不足，采纳所有可用的
+#             # 剩下的从正常缓冲区补充
+#             adv_samples_to_take = adv_size
+#             normal_samples_to_take = batch_size - adv_samples_to_take
+#
+#         # --- 从各自的缓冲区采样索引 ---
+#         normal_batch_inds, adv_batch_inds = [], []
+#         if normal_samples_to_take > 0:
+#             if self.normal_full:
+#                 normal_batch_inds = (np.random.randint(1, self.normal_buffer_size,
+#                                                        size=normal_samples_to_take) + self.normal_pos) % self.normal_buffer_size
+#             else:
+#                 normal_batch_inds = np.random.randint(0, self.normal_pos, size=normal_samples_to_take)
+#
+#         if adv_samples_to_take > 0:
+#             if self.adv_full:
+#                 adv_batch_inds = (np.random.randint(1, self.adv_buffer_size,
+#                                                     size=adv_samples_to_take) + self.adv_pos) % self.adv_buffer_size
+#             else:
+#                 adv_batch_inds = np.random.randint(0, self.adv_pos, size=adv_samples_to_take)
+#
+#         return self._get_samples_from_inds(normal_batch_inds, adv_batch_inds, env=env)
+#
+#     # 在 buffer.py 的 DualReplayBufferDefender 类中
+#
+#     def _get_samples_from_inds(self, normal_batch_inds: np.ndarray, adv_batch_inds: np.ndarray, env=None):
+#         # --- 随机采样环境索引 ---
+#         normal_env_indices = np.random.randint(0, high=self.n_envs, size=(len(normal_batch_inds),))
+#         adv_env_indices = np.random.randint(0, high=self.n_envs, size=(len(adv_batch_inds),))
+#
+#         # --- 定义期望的形状 ---
+#         # obs_shape 是 (obs_dim,)，例如 (26,)
+#         # 我们期望的二维形状是 (num_samples, obs_dim)，例如 (32, 26)
+#         # 空数组的形状应该是 (0, obs_dim)，例如 (0, 26)
+#         expected_obs_shape = (0, *self.obs_shape)
+#         expected_action_shape = (0, self.action_dim)
+#
+#         # --- 从正常缓冲区获取数据 ---
+#         if len(normal_batch_inds) > 0:
+#             if self.optimize_memory_usage:
+#                 normal_next_obs_arr = self.normal_observations[(normal_batch_inds + 1) % self.normal_buffer_size,
+#                                       normal_env_indices, :]
+#             else:
+#                 normal_next_obs_arr = self.normal_next_observations[normal_batch_inds, normal_env_indices, :]
+#
+#             normal_obs = self._normalize_obs(self.normal_observations[normal_batch_inds, normal_env_indices, :], env)
+#             normal_next_obs = self._normalize_obs(normal_next_obs_arr, env)
+#             normal_actions = self.normal_actions[normal_batch_inds, normal_env_indices, :]
+#             normal_dones = (self.normal_dones[normal_batch_inds, normal_env_indices] * (
+#                         1 - self.normal_timeouts[normal_batch_inds, normal_env_indices])).reshape(-1, 1)
+#             normal_rewards = self._normalize_reward(
+#                 self.normal_rewards[normal_batch_inds, normal_env_indices].reshape(-1, 1), env)
+#             normal_obs_eps = normal_obs
+#             normal_is_per = np.zeros_like(normal_dones, dtype=bool)
+#         else:
+#             # --- 核心修改点 1 ---
+#             # 如果没有正常样本，创建正确维度的空数组
+#             normal_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             normal_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             normal_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
+#             normal_dones = np.zeros((0, 1), dtype=np.float32)
+#             normal_rewards = np.zeros((0, 1), dtype=np.float32)
+#             normal_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             normal_is_per = np.zeros((0, 1), dtype=bool)
+#
+#         # --- 从对抗缓冲区获取数据 ---
+#         if len(adv_batch_inds) > 0:
+#             if self.optimize_memory_usage:
+#                 adv_next_obs_arr = self.adv_observations[(adv_batch_inds + 1) % self.adv_buffer_size, adv_env_indices,
+#                                    :]
+#             else:
+#                 adv_next_obs_arr = self.adv_next_observations[adv_batch_inds, adv_env_indices, :]
+#
+#             adv_obs = self._normalize_obs(self.adv_observations[adv_batch_inds, adv_env_indices, :], env)
+#             adv_next_obs = self._normalize_obs(adv_next_obs_arr, env)
+#             adv_actions = self.adv_actions[adv_batch_inds, adv_env_indices, :]
+#             adv_dones = (self.adv_dones[adv_batch_inds, adv_env_indices] * (
+#                         1 - self.adv_timeouts[adv_batch_inds, adv_env_indices])).reshape(-1, 1)
+#             adv_rewards = self._normalize_reward(self.adv_rewards[adv_batch_inds, adv_env_indices].reshape(-1, 1), env)
+#             adv_obs_eps = self._normalize_obs(self.adv_observations_eps[adv_batch_inds, adv_env_indices, :], env)
+#             adv_is_per = np.ones_like(adv_dones, dtype=bool)
+#         else:
+#             # --- 核心修改点 2 ---
+#             # 如果没有对抗样本，创建正确维度的空数组
+#             adv_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             adv_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             adv_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
+#             adv_dones = np.zeros((0, 1), dtype=np.float32)
+#             adv_rewards = np.zeros((0, 1), dtype=np.float32)
+#             adv_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
+#             adv_is_per = np.zeros((0, 1), dtype=bool)
+#
+#         # --- 合并正常和对抗数据 ---
+#         # 现在两个数组要么都是二维，要么一个是二维另一个是(0, dim)的二维空数组，可以安全拼接
+#         obs = np.concatenate((normal_obs, adv_obs), axis=0)
+#         next_obs = np.concatenate((normal_next_obs, adv_next_obs), axis=0)
+#         actions = np.concatenate((normal_actions, adv_actions), axis=0)
+#         dones = np.concatenate((normal_dones, adv_dones), axis=0)
+#         rewards = np.concatenate((normal_rewards, adv_rewards), axis=0)
+#         obs_eps = np.concatenate((normal_obs_eps, adv_obs_eps), axis=0)
+#         obs_is_per = np.concatenate((normal_is_per, adv_is_per), axis=0)
+#
+#         # --- 创建并返回 ReplayBufferSamples 对象 ---
+#         data = (obs, actions, next_obs, dones, rewards, obs_eps, obs_is_per)
+#
+#         samples_tuple = tuple(map(self.to_torch, data))
+#         return ReplayBufferSamples(*samples_tuple)
+
+    # In buffer.py
 
 class DualReplayBufferDefender(ReplayBuffer):
     """
-    一个将正常样本和对抗样本分别存储在不同内部缓冲区的Replay Buffer。
-    这允许进行平衡采样，以防止稀疏的对抗样本被淹没。
-
-    :param buffer_size: 缓冲区的总大小。
-    :param observation_space: 观测空间。
-    :param action_space: 动作空间。
-    :param device: 存储数据的设备（CPU或GPU）。
-    :param n_envs: 并行环境的数量。
-    :param adv_sample_ratio: 每个批次中期望的对抗样本比例。
-    :param optimize_memory_usage: 是否优化内存使用。
-    :param handle_timeout_termination: 是否处理超时终止。
+    一个完全基于 PyTorch Tensor 的、在指定设备上运行的双重回放缓冲区。
     """
 
     def __init__(
@@ -132,13 +396,10 @@ class DualReplayBufferDefender(ReplayBuffer):
             device: Union[th.device, str],
             n_envs: int = 1,
             optimize_memory_usage: bool = False,
-            adv_sample_ratio: float = 0.5,  # 新增参数，用于控制采样比例
+            adv_sample_ratio: float = 0.5,
             handle_timeout_termination: bool = True,
     ):
-        # 调用父类的构造函数，但我们会重写大部分属性
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
-
-        # --- 核心改动：为正常和对抗数据分割缓冲区大小 ---
 
         self.adv_sample_ratio = adv_sample_ratio
         adv_buffer_size = int(buffer_size * adv_sample_ratio)
@@ -147,49 +408,30 @@ class DualReplayBufferDefender(ReplayBuffer):
         self.normal_buffer_size = max(normal_buffer_size // n_envs, 1)
         self.adv_buffer_size = max(adv_buffer_size // n_envs, 1)
 
-        # --- 内存及其他设置（与原始代码类似） ---
-        if psutil is not None:
-            mem_available = psutil.virtual_memory().available
-        if optimize_memory_usage and handle_timeout_termination:
-            raise ValueError(
-                "ReplayBuffer不支持同时设置 optimize_memory_usage = True "
-                "和 handle_timeout_termination = True。"
-            )
-        self.optimize_memory_usage = optimize_memory_usage
-        self.handle_timeout_termination = handle_timeout_termination
+        # 不再需要 optimize_memory_usage, 因为Tensor操作不兼容
+        # --- 为正常样本创建独立的Tensor ---
+        self.normal_observations = th.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
+                                            device=self.device, dtype=th.float32)
+        self.normal_next_observations = th.zeros_like(self.normal_observations)
+        self.normal_actions = th.zeros((self.normal_buffer_size, self.n_envs, self.action_dim), device=self.device,
+                                       dtype=th.float32)
+        self.normal_rewards = th.zeros((self.normal_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
+        self.normal_dones = th.zeros((self.normal_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
 
-        # --- 为正常样本创建独立的numpy数组 ---
-        self.normal_observations = np.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
-                                            dtype=observation_space.dtype)
-        self.normal_actions = np.zeros((self.normal_buffer_size, self.n_envs, self.action_dim),
-                                       dtype=self._maybe_cast_dtype(action_space.dtype))
-        self.normal_rewards = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
-        self.normal_dones = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
-        self.normal_timeouts = np.zeros((self.normal_buffer_size, self.n_envs), dtype=np.float32)
-        if not optimize_memory_usage:
-            self.normal_next_observations = np.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
-                                                     dtype=observation_space.dtype)
+        # --- 为对抗样本创建独立的Tensor ---
+        self.adv_observations = th.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape), device=self.device,
+                                         dtype=th.float32)
+        self.adv_observations_eps = th.zeros_like(self.adv_observations)
+        self.adv_next_observations = th.zeros_like(self.adv_observations)
+        self.adv_actions = th.zeros((self.adv_buffer_size, self.n_envs, self.action_dim), device=self.device,
+                                    dtype=th.float32)
+        self.adv_rewards = th.zeros((self.adv_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
+        self.adv_dones = th.zeros((self.adv_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
 
-        # --- 为对抗样本创建独立的numpy数组 ---
-        self.adv_observations = np.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape),
-                                         dtype=observation_space.dtype)
-        self.adv_observations_eps = np.zeros_like(self.adv_observations)  # 对抗缓冲区需要存储扰动后的观测
-        self.adv_actions = np.zeros((self.adv_buffer_size, self.n_envs, self.action_dim),
-                                    dtype=self._maybe_cast_dtype(action_space.dtype))
-        self.adv_rewards = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
-        self.adv_dones = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
-        self.adv_timeouts = np.zeros((self.adv_buffer_size, self.n_envs), dtype=np.float32)
-        if not optimize_memory_usage:
-            self.adv_next_observations = np.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape),
-                                                  dtype=observation_space.dtype)
-
-        # --- 为每个缓冲区设置独立的指针和满标志位 ---
         self.normal_pos = 0
         self.normal_full = False
         self.adv_pos = 0
         self.adv_full = False
-
-        # 注意：不再需要 self.obs_is_perturbed，因为数据存储的位置已经隐含了这个信息。
 
     def add(
             self,
@@ -202,64 +444,49 @@ class DualReplayBufferDefender(ReplayBuffer):
             obs_eps: Optional[np.ndarray] = None,
             obs_is_per: Union[np.ndarray, bool] = False,
     ) -> None:
-        # 像原始代码一样重塑输入
-        if isinstance(self.observation_space, spaces.Discrete):
-            obs = obs.reshape((self.n_envs, *self.obs_shape))
-            next_obs = next_obs.reshape((self.n_envs, *self.obs_shape))
-            if obs_eps is not None:
-                obs_eps = obs_eps.reshape((self.n_envs, *self.obs_shape))
-        action = action.reshape((self.n_envs, self.action_dim))
+        # 数据在进入时从 numpy 转换为 tensor，这是唯一一次转换！
+        obs = self.to_torch(obs)
+        next_obs = self.to_torch(next_obs)
+        action = self.to_torch(action)
+        reward = self.to_torch(reward)
+        done = self.to_torch(done)
 
         # --- 核心改动：根据标志位将数据路由到正确的缓冲区 ---
-        if np.any(obs_is_per):  # 如果向量化环境中有任何一个样本被扰动
-            # 添加到对抗缓冲区
-            if obs_eps is None:  # 对抗样本理应有obs_eps，这里作为备用
-                obs_eps = np.array(obs, copy=True)
-
-            self.adv_observations[self.adv_pos] = np.array(obs)
-            self.adv_observations_eps[self.adv_pos] = np.array(obs_eps)
-
-            if self.optimize_memory_usage:
-                self.adv_observations[(self.adv_pos + 1) % self.adv_buffer_size] = np.array(next_obs)
+        if np.any(obs_is_per):
+            if obs_eps is None:
+                obs_eps = obs.clone()
             else:
-                self.adv_next_observations[self.adv_pos] = np.array(next_obs)
+                obs_eps = self.to_torch(obs_eps)
 
-            self.adv_actions[self.adv_pos] = np.array(action)
-            self.adv_rewards[self.adv_pos] = np.array(reward)
-            self.adv_dones[self.adv_pos] = np.array(done)
-            if self.handle_timeout_termination:
-                self.adv_timeouts[self.adv_pos] = np.array([info.get("TimeLimit.truncated", False) for info in infos])
+            self.adv_observations[self.adv_pos] = obs
+            self.adv_observations_eps[self.adv_pos] = obs_eps
+            self.adv_next_observations[self.adv_pos] = next_obs
+            self.adv_actions[self.adv_pos] = action
+            self.adv_rewards[self.adv_pos] = reward
+            self.adv_dones[self.adv_pos] = done
 
             self.adv_pos += 1
             if self.adv_pos == self.adv_buffer_size:
                 self.adv_full = True
                 self.adv_pos = 0
-            print("DEBUG buffer.py add: adv_pos =", self.adv_pos)
         else:
-            # 添加到正常缓冲区
-            self.normal_observations[self.normal_pos] = np.array(obs)
-
-            if self.optimize_memory_usage:
-                self.normal_observations[(self.normal_pos + 1) % self.normal_buffer_size] = np.array(next_obs)
-            else:
-                self.normal_next_observations[self.normal_pos] = np.array(next_obs)
-
-            self.normal_actions[self.normal_pos] = np.array(action)
-            self.normal_rewards[self.normal_pos] = np.array(reward)
-            self.normal_dones[self.normal_pos] = np.array(done)
-            if self.handle_timeout_termination:
-                self.normal_timeouts[self.normal_pos] = np.array(
-                    [info.get("TimeLimit.truncated", False) for info in infos])
+            self.normal_observations[self.normal_pos] = obs
+            self.normal_next_observations[self.normal_pos] = next_obs
+            self.normal_actions[self.normal_pos] = action
+            self.normal_rewards[self.normal_pos] = reward
+            self.normal_dones[self.normal_pos] = done
 
             self.normal_pos += 1
             if self.normal_pos == self.normal_buffer_size:
                 self.normal_full = True
                 self.normal_pos = 0
-            print("DEBUG buffer.py add: normal_pos =", self.normal_pos)
+
+    # In buffer.py, inside the DualReplayBufferDefender class
 
     def sample(self, batch_size: int, env=None) -> ReplayBufferSamples:
         """
-        从双重回放缓冲区中采样元素。
+        从完全基于PyTorch Tensor的双重回放缓冲区中采样元素。
+        整个过程都在 self.device (例如GPU) 上完成。
         """
         # --- 核心改动：从两个缓冲区进行平衡采样 ---
         adv_samples_to_take = int(batch_size * self.adv_sample_ratio)
@@ -270,117 +497,112 @@ class DualReplayBufferDefender(ReplayBuffer):
 
         # --- 根据可用数据调整采样数量 ---
         if adv_size == 0:
-            # 还没有对抗样本，全部从正常缓冲区采样
             normal_samples_to_take = batch_size
             adv_samples_to_take = 0
         elif adv_size < adv_samples_to_take:
-            # 对抗样本不足，采纳所有可用的
-            # 剩下的从正常缓冲区补充
             adv_samples_to_take = adv_size
             normal_samples_to_take = batch_size - adv_samples_to_take
 
-        # --- 从各自的缓冲区采样索引 ---
-        normal_batch_inds, adv_batch_inds = [], []
+        # 确保正常样本足够
+        if normal_size < normal_samples_to_take:
+            normal_samples_to_take = normal_size
+            # 如果需要，可以重新平衡 adv_samples_to_take，但这通常不是必需的
+
+        # --- 从各自的缓冲区采样索引 (使用PyTorch) ---
         if normal_samples_to_take > 0:
-            if self.normal_full:
-                normal_batch_inds = (np.random.randint(1, self.normal_buffer_size,
-                                                       size=normal_samples_to_take) + self.normal_pos) % self.normal_buffer_size
-            else:
-                normal_batch_inds = np.random.randint(0, self.normal_pos, size=normal_samples_to_take)
+            normal_batch_inds = th.randint(0, normal_size, (normal_samples_to_take,), device=self.device)
+        else:
+            normal_batch_inds = th.tensor([], dtype=th.long, device=self.device)
 
         if adv_samples_to_take > 0:
-            if self.adv_full:
-                adv_batch_inds = (np.random.randint(1, self.adv_buffer_size,
-                                                    size=adv_samples_to_take) + self.adv_pos) % self.adv_buffer_size
-            else:
-                adv_batch_inds = np.random.randint(0, self.adv_pos, size=adv_samples_to_take)
+            adv_batch_inds = th.randint(0, adv_size, (adv_samples_to_take,), device=self.device)
+        else:
+            adv_batch_inds = th.tensor([], dtype=th.long, device=self.device)
 
-        return self._get_samples_from_inds(normal_batch_inds, adv_batch_inds, env=env)
+        return self._get_samples(normal_batch_inds, adv_batch_inds, env=env)
 
-    # 在 buffer.py 的 DualReplayBufferDefender 类中
-
-    def _get_samples_from_inds(self, normal_batch_inds: np.ndarray, adv_batch_inds: np.ndarray, env=None):
-        # --- 随机采样环境索引 ---
-        normal_env_indices = np.random.randint(0, high=self.n_envs, size=(len(normal_batch_inds),))
-        adv_env_indices = np.random.randint(0, high=self.n_envs, size=(len(adv_batch_inds),))
-
-        # --- 定义期望的形状 ---
-        # obs_shape 是 (obs_dim,)，例如 (26,)
-        # 我们期望的二维形状是 (num_samples, obs_dim)，例如 (32, 26)
-        # 空数组的形状应该是 (0, obs_dim)，例如 (0, 26)
-        expected_obs_shape = (0, *self.obs_shape)
-        expected_action_shape = (0, self.action_dim)
+    def _get_samples(self, normal_batch_inds: th.Tensor, adv_batch_inds: th.Tensor, env=None) -> ReplayBufferSamples:
+        """
+        直接从底层的PyTorch Tensor存储中获取数据。
+        """
+        # --- 随机采样环境索引 (使用PyTorch) ---
+        if self.n_envs > 1:
+            normal_env_indices = th.randint(0, self.n_envs, (len(normal_batch_inds),), device=self.device)
+            adv_env_indices = th.randint(0, self.n_envs, (len(adv_batch_inds),), device=self.device)
+        else:
+            normal_env_indices = th.zeros(len(normal_batch_inds), dtype=th.long, device=self.device)
+            adv_env_indices = th.zeros(len(adv_batch_inds), dtype=th.long, device=self.device)
 
         # --- 从正常缓冲区获取数据 ---
         if len(normal_batch_inds) > 0:
-            if self.optimize_memory_usage:
-                normal_next_obs_arr = self.normal_observations[(normal_batch_inds + 1) % self.normal_buffer_size,
-                                      normal_env_indices, :]
-            else:
-                normal_next_obs_arr = self.normal_next_observations[normal_batch_inds, normal_env_indices, :]
-
-            normal_obs = self._normalize_obs(self.normal_observations[normal_batch_inds, normal_env_indices, :], env)
-            normal_next_obs = self._normalize_obs(normal_next_obs_arr, env)
+            # 直接从Tensor中索引
+            normal_obs = self.normal_observations[normal_batch_inds, normal_env_indices, :]
+            normal_next_obs = self.normal_next_observations[normal_batch_inds, normal_env_indices, :]
             normal_actions = self.normal_actions[normal_batch_inds, normal_env_indices, :]
-            normal_dones = (self.normal_dones[normal_batch_inds, normal_env_indices] * (
-                        1 - self.normal_timeouts[normal_batch_inds, normal_env_indices])).reshape(-1, 1)
-            normal_rewards = self._normalize_reward(
-                self.normal_rewards[normal_batch_inds, normal_env_indices].reshape(-1, 1), env)
+            normal_dones = self.normal_dones[normal_batch_inds, normal_env_indices].reshape(-1, 1)
+            normal_rewards = self.normal_rewards[normal_batch_inds, normal_env_indices].reshape(-1, 1)
+            # 正常样本没有扰动，obs_eps就是obs
             normal_obs_eps = normal_obs
-            normal_is_per = np.zeros_like(normal_dones, dtype=bool)
+            # 扰动标志为False
+            normal_is_per = th.zeros_like(normal_dones, dtype=th.bool)
         else:
-            # --- 核心修改点 1 ---
-            # 如果没有正常样本，创建正确维度的空数组
-            normal_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            normal_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            normal_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
-            normal_dones = np.zeros((0, 1), dtype=np.float32)
-            normal_rewards = np.zeros((0, 1), dtype=np.float32)
-            normal_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            normal_is_per = np.zeros((0, 1), dtype=bool)
+            # 创建正确形状和类型的空Tensor
+            empty_obs_shape = (0, *self.obs_shape)
+            empty_action_shape = (0, self.action_dim)
+            normal_obs = th.zeros(empty_obs_shape, device=self.device, dtype=th.float32)
+            normal_next_obs = th.zeros_like(normal_obs)
+            normal_actions = th.zeros(empty_action_shape, device=self.device, dtype=th.float32)
+            normal_dones = th.zeros((0, 1), device=self.device, dtype=th.float32)
+            normal_rewards = th.zeros_like(normal_dones)
+            normal_obs_eps = th.zeros_like(normal_obs)
+            normal_is_per = th.zeros((0, 1), device=self.device, dtype=th.bool)
 
         # --- 从对抗缓冲区获取数据 ---
         if len(adv_batch_inds) > 0:
-            if self.optimize_memory_usage:
-                adv_next_obs_arr = self.adv_observations[(adv_batch_inds + 1) % self.adv_buffer_size, adv_env_indices,
-                                   :]
-            else:
-                adv_next_obs_arr = self.adv_next_observations[adv_batch_inds, adv_env_indices, :]
-
-            adv_obs = self._normalize_obs(self.adv_observations[adv_batch_inds, adv_env_indices, :], env)
-            adv_next_obs = self._normalize_obs(adv_next_obs_arr, env)
+            adv_obs = self.adv_observations[adv_batch_inds, adv_env_indices, :]
+            adv_next_obs = self.adv_next_observations[adv_batch_inds, adv_env_indices, :]
             adv_actions = self.adv_actions[adv_batch_inds, adv_env_indices, :]
-            adv_dones = (self.adv_dones[adv_batch_inds, adv_env_indices] * (
-                        1 - self.adv_timeouts[adv_batch_inds, adv_env_indices])).reshape(-1, 1)
-            adv_rewards = self._normalize_reward(self.adv_rewards[adv_batch_inds, adv_env_indices].reshape(-1, 1), env)
-            adv_obs_eps = self._normalize_obs(self.adv_observations_eps[adv_batch_inds, adv_env_indices, :], env)
-            adv_is_per = np.ones_like(adv_dones, dtype=bool)
+            adv_dones = self.adv_dones[adv_batch_inds, adv_env_indices].reshape(-1, 1)
+            adv_rewards = self.adv_rewards[adv_batch_inds, adv_env_indices].reshape(-1, 1)
+            adv_obs_eps = self.adv_observations_eps[adv_batch_inds, adv_env_indices, :]
+            # 扰动标志为True
+            adv_is_per = th.ones_like(adv_dones, dtype=th.bool)
         else:
-            # --- 核心修改点 2 ---
-            # 如果没有对抗样本，创建正确维度的空数组
-            adv_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            adv_next_obs = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            adv_actions = np.zeros(expected_action_shape, dtype=self.action_space.dtype)
-            adv_dones = np.zeros((0, 1), dtype=np.float32)
-            adv_rewards = np.zeros((0, 1), dtype=np.float32)
-            adv_obs_eps = np.zeros(expected_obs_shape, dtype=self.observation_space.dtype)
-            adv_is_per = np.zeros((0, 1), dtype=bool)
+            empty_obs_shape = (0, *self.obs_shape)
+            empty_action_shape = (0, self.action_dim)
+            adv_obs = th.zeros(empty_obs_shape, device=self.device, dtype=th.float32)
+            adv_next_obs = th.zeros_like(adv_obs)
+            adv_actions = th.zeros(empty_action_shape, device=self.device, dtype=th.float32)
+            adv_dones = th.zeros((0, 1), device=self.device, dtype=th.float32)
+            adv_rewards = th.zeros_like(adv_dones)
+            adv_obs_eps = th.zeros_like(adv_obs)
+            adv_is_per = th.zeros((0, 1), device=self.device, dtype=th.bool)
 
-        # --- 合并正常和对抗数据 ---
-        # 现在两个数组要么都是二维，要么一个是二维另一个是(0, dim)的二维空数组，可以安全拼接
-        obs = np.concatenate((normal_obs, adv_obs), axis=0)
-        next_obs = np.concatenate((normal_next_obs, adv_next_obs), axis=0)
-        actions = np.concatenate((normal_actions, adv_actions), axis=0)
-        dones = np.concatenate((normal_dones, adv_dones), axis=0)
-        rewards = np.concatenate((normal_rewards, adv_rewards), axis=0)
-        obs_eps = np.concatenate((normal_obs_eps, adv_obs_eps), axis=0)
-        obs_is_per = np.concatenate((normal_is_per, adv_is_per), axis=0)
+        # --- 合并正常和对抗数据 (使用PyTorch) ---
+        obs = th.cat((normal_obs, adv_obs), dim=0)
+        next_obs = th.cat((normal_next_obs, adv_next_obs), dim=0)
+        actions = th.cat((normal_actions, adv_actions), dim=0)
+        dones = th.cat((normal_dones, adv_dones), dim=0)
+        rewards = th.cat((normal_rewards, adv_rewards), dim=0)
+        obs_eps = th.cat((normal_obs_eps, adv_obs_eps), dim=0)
+        obs_is_per = th.cat((normal_is_per, adv_is_per), dim=0)
 
-        # --- 创建并返回 ReplayBufferSamples 对象 ---
-        data = (obs, actions, next_obs, dones, rewards, obs_eps, obs_is_per)
+        # Normalize obs and rewards if needed (this part is tricky and often better handled outside the buffer)
+        # For simplicity, we assume normalization is handled by VecNormalize wrapper if used
+        # if env is not None:
+        #     obs = self._normalize_obs(obs, env)
+        #     next_obs = self._normalize_obs(next_obs, env)
+        #     rewards = self._normalize_reward(rewards, env)
 
-        samples_tuple = tuple(map(self.to_torch, data))
-        return ReplayBufferSamples(*samples_tuple)
+        return ReplayBufferSamples(
+            observations=obs,
+            actions=actions,
+            next_observations=next_obs,
+            dones=dones,
+            rewards=rewards,
+            observations_eps=obs_eps,
+            obs_is_perturbed=obs_is_per,
+        )
 
 
 

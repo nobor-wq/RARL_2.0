@@ -1,10 +1,9 @@
-from stable_baselines3.common.callbacks import EvalCallback, EventCallback
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
 from evaluation import evaluate_policy_adv, evaluate_policy_def
 import numpy as np
 import os
-from stable_baselines3.common.monitor import Monitor
-
+import torch as th
 
 class CustomEvalCallback_adv(EvalCallback):
     def __init__(
@@ -137,7 +136,10 @@ class CustomEvalCallback_adv(EvalCallback):
                 if self.verbose >= 1:
                     print("New best mean reward!")
                 if self.best_model_save_path is not None:
-                    self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    pth_path = os.path.join(self.best_model_save_path, "policy_eval_best.pth")
+                    th.save(self.model.policy.state_dict(), pth_path)
+
+                    # self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = float(mean_reward)
                 # Trigger callback on new best model, if needed
                 if self.callback_on_new_best is not None:
@@ -285,7 +287,9 @@ class CustomEvalCallback_def(EvalCallback):
                 if self.verbose >= 1:
                     print("New best mean reward!")
                 if self.best_model_save_path is not None:
-                    self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    pth_path = os.path.join(self.best_model_save_path, "policy_eval_best.pth")
+                    th.save(self.model.policy.state_dict(), pth_path)
+                    # self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = float(mean_reward)
                 # Trigger callback on new best model, if needed
                 if self.callback_on_new_best is not None:

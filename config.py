@@ -34,6 +34,8 @@ def get_config():
     parser.add_argument('--save_freq', type=int, default=100000, help='frequency of saving the model')
     parser.add_argument('--n_steps', type=int, default=128, help='control n_rollout_steps, for PPO')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+    parser.add_argument('--lr_def', type=float, default=1e-3, help='learning rate')
+
     parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--n_epochs', type=int, default=15, help='number of training epochs')
     parser.add_argument('--ent_coef', type=float, default=0, help='coefficient of entropy')
@@ -86,6 +88,7 @@ def get_config():
     parser.add_argument('--adv_test', action='store_true', help='only test attacker')
     parser.add_argument('--adv_algo_name', default="attacker_v168_20250813_2342_2_57_005.pth", help='attack algorithm')
     parser.add_argument('--action_diff', action='store_true', help='Action difference constraint')
+    parser.add_argument('--action_diff_coef', type=float, default=5.0,help='Coefficient for the action difference constraint loss')
     parser.add_argument('--use_expert', action='store_true', help='whether to use expert')
     parser.add_argument('--use_kl', action='store_true', help='whether to use expert')
     parser.add_argument('--kl_coef', type=float, default=0.02, help='epsilon-ball around init state')
@@ -97,6 +100,7 @@ def get_config():
     parser.add_argument('--lagrangian_eps', type=float, default=0.01, help='epsilon-ball around init state')
     parser.add_argument('--lagrangian-lr', type=float, default=1e-4, help='Learning rate for Lagrangian multiplier')
 
+    parser.add_argument('--n_eval_episodes', type=int, default=20, help='number of training episodes')
 
 
     return parser

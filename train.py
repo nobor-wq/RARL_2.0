@@ -7,18 +7,116 @@ import gymnasium as gym
 from stable_baselines3.common.monitor import Monitor
 import swanlab
 import Environment.environment
-from stable_baselines3 import PPO, SAC, TD3
-from wandb.integration.sb3 import WandbCallback
+from stable_baselines3 import PPO, SAC
 from callback import CustomEvalCallback_adv, CustomEvalCallback_def
 import random
 from buffer import DecoupleRolloutBuffer, ReplayBufferDefender, DualReplayBufferDefender
-from adversarial_ppo import AdversarialPPO, AdversarialDecouplePPO
+from adversarial_ppo import AdversarialDecouplePPO
 from defensive_sac import DefensiveSAC
-from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import os
 from swanlab.integration.sb3 import SwanLabCallback
 from policy import IGCARLNet
+from stable_baselines3.common.utils import obs_as_tensor
+from fgsm import FGSM_v2
+
+def final_evaluation(args, final_defender, final_attacker, device):
+    """
+    在整个训练流程结束后，对最终的防御者和攻击者进行一次独立的评估。
+    模仿 defense_test.py 的逻辑。
+    """
+    print("\n--- Starting Final Evaluation ---")
+
+    np.random.seed(args.seed + 100)  # 设置 NumPy 随机种子
+    th.manual_seed(args.seed + 100)  # 设置 CPU 随机种子
+    if th.cuda.is_available():
+        th.cuda.manual_seed(args.seed + 100)  # 设置 CUDA 随机种子
+        th.cuda.manual_seed_all(args.seed + 100)  # 设置所有 GPU 随机种子
+    th.backends.cudnn.deterministic = True  # 确保 CUDA 的确定性
+    th.backends.cudnn.benchmark = False  # 禁用 CuDNN 自动优化
+
+    # 设置eval标志
+    args.eval = True
+    # 创建环境
+    eval_env = gym.make(args.env_name, attack=True, adv_steps=args.adv_steps, eval=args.eval, use_gui=args.use_gui,
+                   render_mode=args.render_mode)
+    eval_env.unwrapped.start()
+    # 2. 准备模型 (它们已经从参数传入)
+    # 确保模型处于评估模式
+    final_defender.policy.set_training_mode(False)
+    final_attacker.policy.set_training_mode(False)
+
+    # 3. 循环评估
+    rewards = []
+    num_eval_episodes = 500  # 可以设一个比训练中评估更精确的次数
+    sn = 0
+
+    for _ in range(num_eval_episodes):
+        obs, _ = eval_env.reset(options="random")
+        episode_reward = 0.0
+        for _ in range(args.T_horizon):
+            # --- 这部分逻辑完全来自于你的 defense_test.py ---
+            obs_tensor = obs_as_tensor(obs, device)
+
+            # 防御者生成原始动作
+            with th.no_grad():
+                actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
+            actions_tensor = th.tensor(actions, device=obs_tensor.device)  # 确保在同一设备上
+            obs_tensor[-1] = actions_tensor
+            # 攻击者生成攻击动作
+            with th.no_grad():
+                adv_actions, _ = final_attacker.predict(obs_tensor.cpu(), deterministic=True)
+
+            adv_action_mask = (adv_actions[0] > 0) & (obs[-2] > 0)
+            # print("DEBUG train.py adv_action_mask:", adv_action_mask, "adv_actions:", adv_actions, "obs[-2]:", obs[-2])
+
+            if adv_action_mask.any():
+                adv_state = FGSM_v2(adv_actions[1], victim_agent=final_defender,
+                                    last_state=obs_tensor[:-2].unsqueeze(0), epsilon=args.attack_eps, device=device)
+                action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
+                final_action = action_perturbed
+                print("DEBUG train.py action before attack:", actions, "attack action is: ", adv_actions, "after attack:", final_action)
+            else:
+                final_action = actions
+
+            # 组合最终动作并与环境交互
+            action = np.column_stack((final_action, adv_action_mask))
+            obs, reward, done, terminate, info = eval_env.step(action)
+
+            if isinstance(info, dict):
+                info0 = info
+            elif isinstance(info, (list, tuple)) and len(info) > 0:
+                info0 = info[0]
+            else:
+                raise ValueError(f"Invalid infos format: {type(info)}")
+            if 'reward' not in info0:
+                raise KeyError(f"'reward' key not found in info: {info0}")
+
+            r_def = float(info0['reward'])
+            c_def = float(info0['cost'])
+            episode_reward += r_def - c_def
+
+            xa = info['x_position']
+            ya = info['y_position']
+
+            if done:
+                break
+        if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv6-v0':
+            if xa < -50.0 and ya > 4.0 and done is False:
+                sn += 1
+
+        rewards.append(episode_reward)
+
+    eval_env.close()
+
+    mean_reward = np.mean(rewards)
+    mean_success = sn / num_eval_episodes
+    print(f"--- Final Evaluation Result: Mean Reward = {mean_reward:.2f} ---")
+    print(f"--- Final Evaluation Result: Success Rate = {mean_success:.2f} ---\n")
+
+    return mean_success
+
+
 
 def create_model_adv(args, env, device, best_model_path):
     """
@@ -34,6 +132,7 @@ def create_model_adv(args, env, device, best_model_path):
     # if args.decouple:
     model_class = AdversarialDecouplePPO
     rollout_buffer_class_adv = DecoupleRolloutBuffer
+    ppo_device = 'cpu'
 
     model = model_class(args, best_model_path,  "MlpPolicy",
                         env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1,
@@ -59,7 +158,7 @@ def create_model_def(args, env, device, best_model_path, start):
             "MlpPolicy",
             env,
             verbose=1,
-            learning_rate=args.lr,
+            learning_rate=args.lr_def,
             batch_size=args.batch_size,
             device=device,
         )
@@ -88,6 +187,7 @@ def create_model_def(args, env, device, best_model_path, start):
             "MlpPolicy",
             env,
             batch_size=args.batch_size,
+            learning_rate=args.lr_def,
             verbose=1,
             replay_buffer_class=replay_buffer_class_def,
             replay_buffer_kwargs=replay_buffer_kwargs,  # <--- 将参数字典传递给模型
@@ -98,10 +198,10 @@ def create_model_def(args, env, device, best_model_path, start):
 
 
 
-def main():
+def run_training(args):
     # get parameters from config.py
-    parser = get_config()
-    args = parser.parse_args()
+    # parser = get_config()
+    # args = parser.parse_args()
 
     msg_parts = []
     if args.action_diff:
@@ -125,6 +225,7 @@ def main():
     # (可选但推荐) 将生成的消息存回args，方便后续使用
     args.addition_msg = addition_msg
 
+
     print(f"[*] 本次实验标签: {args.addition_msg}")  # 打印出来方便确认
     # defenfer and attacker log path
     eval_def_log_path = os.path.join(args.path_def, args.algo, args.env_name, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
@@ -142,6 +243,7 @@ def main():
         device = th.device(f"cuda:{args.cuda_number}")
     else:
         device = th.device("cpu")
+
 
     # 设置随机种子
     random.seed(args.seed)  # 设置 Python 随机种子
@@ -245,8 +347,7 @@ def main():
     else:
         # 2025-10-26 wq 加载专家模型
         # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
-        defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name,
-                                                 "1", "lunar")
+        defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, "1", "lunar")
         trained_expert = SAC.load(defense_model_expert_path, device=device)
         # 2025-10-26 wq 初始化占位用的“旧”模型
         model_old_def = SAC("MlpPolicy", env_def, device=device)  # 只需要结构，不需要训练
@@ -254,18 +355,21 @@ def main():
 
         # 2025-10-02 wq 防御者预训练 (Standard SAC)
         print("=== Phase 1: Pre-training Defender (Standard SAC) ===")
-        model_def_pre = create_model_def(args, env_def_first, device,
-                                           best_model_path_def, True)
-        model_def_pre.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                              callback=checkpoint_callback_def)
+        # model_def_pre = create_model_def(args, env_def_first, device, best_model_path_def, True)
+        # model_def_pre.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+        #                       callback=checkpoint_callback_def)
+        #
+        # print("Defender pre-training completed.")
 
         # 2025-10-04 wq 需要另外的模型来加载上次训练好的模型
         model_def = create_model_def(args, env_def, device, best_model_path_def, False)
-        model_def.policy.load_state_dict(model_def_pre.policy.state_dict())  # 复制完整策略
+        model_def.policy.load_state_dict(trained_expert.policy.state_dict())  # 复制完整策略
+
 
         env_def_first.close()
-        del model_def_pre
+        # del model_def_pre
         model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
+
 
         print("=== Phase 2: Adversarial Training Loop ===")
         for i in range(args.loop_nums):
@@ -278,7 +382,7 @@ def main():
             eval_callback_adv = CustomEvalCallback_adv(eval_env_adv, trained_agent=model_old_def,
                                                        attack_eps = args.attack_eps,
                                                        best_model_save_path=eval_best_model_path_adv,
-                                                       n_eval_episodes=20,
+                                                       n_eval_episodes=args.n_eval_episodes,
                                                        eval_freq=args.n_steps * 10,
                                                        unlimited_attack=args.unlimited_attack,
                                                        attack_method=args.attack_method)
@@ -294,10 +398,12 @@ def main():
                                                        trained_adv=model_old_adv,
                                                        attack_eps=args.attack_eps,
                                                        best_model_save_path=eval_best_model_path_def,
-                                                       n_eval_episodes=20,
+                                                       n_eval_episodes=args.n_eval_episodes,
                                                        eval_freq=args.n_steps * 10,
                                                        unlimited_attack=args.unlimited_attack,
                                                        attack_method=args.attack_method)
+
+
             print("Training Defender...")
             model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                             callback=[checkpoint_callback_def, eval_callback_def] + callbacks_common, trained_agent=model_old_def,
@@ -313,29 +419,41 @@ def main():
         eval_callback_adv_last = CustomEvalCallback_adv(eval_env_adv_last, trained_agent=model_old_def,
                                                    attack_eps=args.attack_eps,
                                                    best_model_save_path=eval_best_model_path_adv,
-                                                   n_eval_episodes=20,
+                                                   n_eval_episodes=args.n_eval_episodes,
                                                    eval_freq=args.n_steps * 10,
                                                    unlimited_attack=args.unlimited_attack,
                                                    attack_method=args.attack_method)
         model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * args.loop_nums, progress_bar=True,
                         callback=[checkpoint_callback_adv, eval_callback_adv_last] + callbacks_common,
-                        trained_def=model_old_def, reset_num_timesteps=False, log_interval=args.print_interval)
+                        trained_def=model_old_def, reset_num_timesteps=True, log_interval=args.print_interval)
+
+        # final_mean_reward = final_evaluation(args, model_def, model_adv_last, device)
 
         # Save the agent
         eval_env_def.close()
         eval_env_adv.close()
         eval_env_adv_last.close()
 
-        model_adv_last.save(os.path.join(eval_adv_log_path, "lunar"))
+        th.save(model_adv_last.policy.state_dict(), os.path.join(eval_adv_log_path, "policy.pth"))
         del model_adv_last
         env_adv_last.close()
 
         del model_adv
         env_adv.close()
 
-        model_def.save(os.path.join(eval_def_log_path, "lunar"))
+        # model_def.save(os.path.join(eval_def_log_path, "lunar"), exclude=["replay_buffer"])
+        th.save(model_def.policy.state_dict(), os.path.join(eval_def_log_path, "policy.pth"))
+
         del model_def
         env_def.close()
+
+        # return final_mean_reward
+
+def main():
+    # get parameters from config.py
+    parser = get_config()
+    args = parser.parse_args()
+    run_training(args) # 直接调用新的训练函数
 
 if __name__ == '__main__':
     main()

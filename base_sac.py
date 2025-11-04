@@ -51,9 +51,9 @@ def main():
     checkpoint_callback_def = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_def)
 
 
-    def make_env(seed, rank, attack, defender_first=False):
+    def make_env(seed, rank, attack):
         def _init():
-            env = gym.make(args.env_name, attack=attack, defender_first = defender_first, adv_steps=args.adv_steps)
+            env = gym.make(args.env_name, attack=attack, adv_steps=args.adv_steps)
             env = TimeLimit(env, max_episode_steps=args.T_horizon)
             env = Monitor(env)
             env.unwrapped.start()
@@ -64,9 +64,9 @@ def main():
 
     num_envs = args.num_envs if hasattr(args, 'num_envs') else 1
     if num_envs > 1:
-        env_def_first= SubprocVecEnv([make_env(args.seed, i, False, defender_first=True) for i in range(num_envs)])
+        env_def_first= SubprocVecEnv([make_env(args.seed, i, False) for i in range(num_envs)])
     else:
-        env_def_first = DummyVecEnv([make_env(args.seed, 0, False, defender_first=True)])
+        env_def_first = DummyVecEnv([make_env(args.seed, 0, False)])
 
     if args.swanlab:
         run_name = f"base-{args.algo}-{args.seed}-{args.addition_msg}"

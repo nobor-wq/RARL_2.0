@@ -1,13 +1,9 @@
 from off_policy_algorithm import OffPolicyDefensiveAlgorithm, OffPolicyBaseAlgorithm
-from stable_baselines3 import PPO, SAC, TD3
-from policy import FniNet
+from stable_baselines3 import SAC
 import torch as th
-import os
-from fgsm import FGSM_v2
 import numpy as np
 from torch.nn import functional as F
 from stable_baselines3.common.utils import polyak_update
-from stable_baselines3.common.utils import obs_as_tensor
 import torch.optim as optim
 
 class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
@@ -246,23 +242,24 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
 
                     # 步骤 5: 添加到总损失
                     actor_loss = actor_loss_policy + self.kl_coef * kl_loss_masked
-                    print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy)
-                    print("DEBUG defensive_sac.py train self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
-                    print("DEBUG defensive_sac.py train actor_loss: ", actor_loss)
+                    # print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy)
+                    # print("DEBUG defensive_sac.py train self.kl_coef * kl_loss_masked: ", self.kl_coef * kl_loss_masked)
+                    # print("DEBUG defensive_sac.py train actor_loss: ", actor_loss)
 
                     self.logger.record("train_def/self.kl_coef_kl_loss_masked", (self.kl_coef * kl_loss_masked).item())
                 elif self.use_lagrangian:
                     # 步骤 1: 计算“安全”动作 (在干净状态 obs 下的动作)
                     with th.no_grad():
                         # 使用 action_log_prob 获取采样动作，与 actions_pi 保持一致
-                        actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
+                        actions_clean_np, _states = self.predict(obs.cpu(), deterministic=True)
+                        # actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
                         actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                     # 步骤 2: 计算逐样本的均方误差损失 (约束的基础)
                     # actions_pi 是在扰动状态 obs_used 下的动作
                     policy_loss_per_sample = F.mse_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
 
-                    print(f"\n{'=' * 20} DEBUG START {'=' * 20}")
-                    print("DEBUG defensive_sac.py train policy_loss_per_sample: ", policy_loss_per_sample, " shape: ", policy_loss_per_sample.shape)
+                    # print(f"\n{'=' * 20} DEBUG START {'=' * 20}")
+                    # print("DEBUG defensive_sac.py train policy_loss_per_sample: ", policy_loss_per_sample, " shape: ", policy_loss_per_sample.shape)
                     # 步骤 3: 准备拉格朗日乘子
                     # 我们在 actor loss 中使用 lambda 的值，但不通过 actor loss 更新 lambda
                     lam2 = self.log_lam2.exp().detach()
@@ -270,10 +267,10 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     # 步骤 4: 计算 Actor Loss (Primal Objective)
                     # 只对被扰动的样本施加约束
                     mask = obs_is_per.view(-1)
-                    print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
+                    # print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
                     # 将 policy_loss 应用于被扰动的样本，未扰动的损失为0
                     masked_policy_loss = policy_loss_per_sample[mask]
-                    print("DEBUG defensive_sac.py train masked_policy_loss: ", masked_policy_loss, " shape: ", masked_policy_loss.shape)
+                    # print("DEBUG defensive_sac.py train masked_policy_loss: ", masked_policy_loss, " shape: ", masked_policy_loss.shape)
 
                     self.logger.record("train_def/masked_policy_loss", masked_policy_loss.mean().item())
 
@@ -283,7 +280,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     lagrangian_penalty = th.tensor(0.0, device=self.device)
                     if masked_policy_loss.numel() > 0:
                         lagrangian_penalty = (lam2 * masked_policy_loss).mean()
-                        print("DEBUG defensive_sac.py train lagrangian_penalty: ", lagrangian_penalty, " shape: ", lagrangian_penalty.shape)
+                        # print("DEBUG defensive_sac.py train lagrangian_penalty: ", lagrangian_penalty, " shape: ", lagrangian_penalty.shape)
 
                     actor_loss = actor_loss_policy + lagrangian_penalty
 
@@ -323,27 +320,27 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
                     actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                     per_elem_sq = (actions_clean - actions_pi) ** 2
-                    print("DEBUG defensive_sac.py train per_elem_sq: ", per_elem_sq, " shape: ", per_elem_sq.shape)
+                    # print("DEBUG defensive_sac.py train per_elem_sq: ", per_elem_sq, " shape: ", per_elem_sq.shape)
                     per_sample_mse = per_elem_sq.mean(dim=1)
-                    print("DEBUG defensive_sac.py train per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
+                    # print("DEBUG defensive_sac.py train per_sample_mse: ", per_sample_mse, " shape: ", per_sample_mse.shape)
                     mask = obs_is_per.to(device=per_sample_mse.device)
-                    print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
+                    # print("DEBUG defensive_sac.py train mask: ", mask, "shape: ", mask.shape)
                     if mask.dtype.is_floating_point:
                         mask = mask > 0.5
                     else:
                         mask = mask.bool()
                     mask = mask.view(-1)
-                    print("DEBUG defensive_sac.py train mask_1: ", mask, "shape_1: ", mask.shape)
+                    # print("DEBUG defensive_sac.py train mask_1: ", mask, "shape_1: ", mask.shape)
                     # apply mask: false -> zero loss, true -> keep per-sample mse
                     mask_float = mask.to(dtype=per_sample_mse.dtype)
-                    print("DEBUG defensive_sac.py train mask_float: ", mask_float, " shape: ", mask_float.shape)
+                    # print("DEBUG defensive_sac.py train mask_float: ", mask_float, " shape: ", mask_float.shape)
                     masked_per_sample = per_sample_mse * mask_float  # (B,)
-                    print("DEBUG defensive_sac.py train masked_per_sample: ", masked_per_sample, " shape: ", masked_per_sample.shape)
+                    # print("DEBUG defensive_sac.py train masked_per_sample: ", masked_per_sample, " shape: ", masked_per_sample.shape)
                     action_loss_masked = masked_per_sample.mean()
-                    print("DEBUG defensive_sac.py train action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
+                    # print("DEBUG defensive_sac.py train action_loss_masked: ", action_loss_masked, " shape: ", action_loss_masked.shape)
                     actor_loss = actor_loss_policy + action_loss_masked * 10
-                    print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
-                    print("DEBUG defensive_sac.py train actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
+                    # print("DEBUG defensive_sac.py train actor_loss_policy: ", actor_loss_policy, " shape: ", actor_loss_policy.shape)
+                    # print("DEBUG defensive_sac.py train actor_loss: ", actor_loss, " shape: ", actor_loss.shape)
                     self.logger.record("train_def/action_loss_masked_10", (action_loss_masked * 10).item())
             else:
                 actor_loss = actor_loss_policy

@@ -1,17 +1,13 @@
 import gymnasium as gym
 import numpy as np
 from stable_baselines3 import SAC, PPO, TD3  # 或者您使用的其他算法
-from gymnasium.wrappers import TimeLimit
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import obs_as_tensor
 from config import get_config
 import Environment.environment
 import os
 import torch as th
-# from perturbation import *
 from fgsm import FGSM_v2
-from PIL import Image
-from policy import FniNet, IGCARLNet
+from policy import  IGCARLNet
 
 
 # get parameters from config.py
@@ -64,22 +60,17 @@ else:
 if args.attack:
     if args.best_model:
         if args.eval_best_model:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'eval_best_model/best_model')
+            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'eval_best_model/policy_eval_best.pth')
         else:
-            advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'best_model')
+            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy_best.pth')
     else:#str(args.train_eps)
-        advmodel_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'lunar')
+        adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy.pth')
     # 加载训练好的攻击者模型
-    print("DEBUG adv model path: ", advmodel_path)
+    print("DEBUG adv model path: ", adv_model_path)
 
-    if args.algo_adv == 'SAC':
-        model = SAC.load(advmodel_path, device=device)
-    elif args.algo_adv == 'PPO':
-        #advmodel_path = "./logs/adv_eval/TrafficEnv2-v0/SAC/std/lunar"
-        model = PPO.load(advmodel_path, device=device)
-    else:
-        #advmodel_path = "./logs/adv_eval/TrafficEnv2-v0/SAC/std/lunar"
-        model = PPO.load(advmodel_path, device=device)
+    trained_agent = PPO("MlpPolicy", env, verbose=1, device=device)
+    state_dict = th.load(adv_model_path, map_location=device)
+    trained_agent.policy.load_state_dict(state_dict)
 
 
 # 加载训练好的自动驾驶模型
@@ -112,15 +103,30 @@ if args.algo == "IGCARL":
     trained_agent.eval()
 elif args.algo == "RARL":
 
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps), str(args.seed), str(args.trained_step))
+    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps),
+                                                           str(args.seed), str(args.trained_step))
     if args.best_model:
-        model_path = os.path.join(defense_model_path, 'best_model')
+        model_path = os.path.join(defense_model_path, 'policy_best.pth')
     elif args.eval_best_model:
-        model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
+        model_path = os.path.join(defense_model_path, 'eval_best_model', 'policy_eval_best.pth')
     else:
-        model_path = os.path.join(defense_model_path, 'lunar')
+        model_path = os.path.join(defense_model_path, 'policy.pth')
+
     print("DEBUG def model path: ", model_path)
-    trained_agent = SAC.load(model_path, device=device)
+    trained_agent = SAC("MlpPolicy", env, verbose=1, device=device)
+    state_dict = th.load(model_path, map_location=device)
+    trained_agent.policy.load_state_dict(state_dict)
+
+    # defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps), str(args.seed), str(args.trained_step))
+    #
+    # if args.best_model:
+    #     model_path = os.path.join(defense_model_path, 'best_model')
+    # elif args.eval_best_model:
+    #     model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
+    # else:
+    #     model_path = os.path.join(defense_model_path, 'lunar')
+    # print("DEBUG def model path: ", model_path)
+    # trained_agent = SAC.load(model_path, device=device)
 
 # 进行验证
 rewards = []

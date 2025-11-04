@@ -1,4 +1,4 @@
-
+import os
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 from fgsm import FGSM_v2
 import numpy as np
@@ -6,16 +6,12 @@ import torch as th
 import time
 import sys
 from gymnasium import spaces
-from stable_baselines3.common.base_class import BaseAlgorithm
-from stable_baselines3.common.buffers import DictReplayBuffer, ReplayBuffer
+from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
-from stable_baselines3.common.policies import BasePolicy
-from stable_baselines3.common.save_util import load_from_pkl, save_to_pkl
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule, TrainFreq, TrainFrequencyUnit
+from stable_baselines3.common.noise import ActionNoise
+from stable_baselines3.common.type_aliases import RolloutReturn,  TrainFreq, TrainFrequencyUnit
 from stable_baselines3.common.utils import safe_mean, should_collect_more_steps, obs_as_tensor
 from stable_baselines3.common.vec_env import VecEnv
-from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 SelfOffPolicyAlgorithm = TypeVar("SelfOffPolicyAlgorithm", bound="OffPolicyAlgorithm")
 from copy import deepcopy
@@ -44,7 +40,10 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
         if safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]) >= self.max_epi_reward:
-            self.save(self.best_model_path)
+            policy_save_path = os.path.join(self.best_model_path, "policy_best.pth")
+            os.makedirs(os.path.dirname(policy_save_path), exist_ok=True)
+            th.save(self.policy.state_dict(), policy_save_path)
+            print(f"✅ 保存策略权重到: {policy_save_path}")
             self.max_epi_reward = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
 
 

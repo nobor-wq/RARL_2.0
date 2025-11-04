@@ -1,3 +1,4 @@
+import os
 import torch as th
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3.common.utils import obs_as_tensor, safe_mean
@@ -6,7 +7,6 @@ import sys
 from fgsm import FGSM_v2
 from gymnasium import spaces
 import numpy as np
-from buffer import PaddingRolloutBuffer, DecouplePaddingRolloutBuffer
 
 class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
     """
@@ -107,9 +107,7 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
                     rewards -= re_c
 
             if adv_action_mask:
-                if self.base_cost != 0:
-                    base_cost = self.base_cost
-                    k = 1.0
+                if not dones:
                     att_remain = new_obs[:, -2]
                     # attack_cost = base_cost * (1.0 + k * (1.0 - att_remain))
                     attack_cost = 1.0 - att_remain
@@ -233,8 +231,13 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
     def _dump_logs(self, iteration):
         super()._dump_logs(iteration)
         if safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]) <= self.max_epi_reward:
-            self.save(self.best_model_path)
-            self.max_epi_reward = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
+            policy_save_path = os.path.join(self.best_model_path, "policy_best.pth")
+            os.makedirs(os.path.dirname(policy_save_path), exist_ok=True)
+            th.save(self.policy.state_dict(), policy_save_path)
+            print(f"✅ 保存策略权重到: {policy_save_path}")
+
+            # self.save(self.best_model_path)
+            # self.max_epi_reward = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
 
     def learn(
             self,

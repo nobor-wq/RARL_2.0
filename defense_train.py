@@ -10,10 +10,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import wandb
 from wandb.integration.sb3 import WandbCallback
-from callback import CustomEvalCallback
 import random
 from buffer import PaddingRolloutBuffer, DecoupleRolloutBuffer, DecouplePaddingRolloutBuffer
-from defense_ppo import DefensePPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3 import PPO
