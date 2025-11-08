@@ -34,6 +34,7 @@ args.eval = True
 # 创建环境
 env = gym.make(args.env_name, attack=args.attack, adv_steps=args.adv_steps, eval=args.eval, use_gui=args.use_gui,
                render_mode=args.render_mode)
+temp_def_env = gym.make(args.env_name, attack=False) # attack=False 是关键！
 env.unwrapped.start()
 
 msg_parts = []
@@ -62,35 +63,18 @@ if args.attack:
         if args.eval_best_model:
             adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'eval_best_model/policy_eval_best.pth')
         else:
-            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy_best.pth')
+            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'best_model/policy_best.pth')
     else:#str(args.train_eps)
         adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy.pth')
     # 加载训练好的攻击者模型
     print("DEBUG adv model path: ", adv_model_path)
 
-    trained_agent = PPO("MlpPolicy", env, verbose=1, device=device)
+    model = PPO("MlpPolicy", env, verbose=1, device=device)
     state_dict = th.load(adv_model_path, map_location=device)
-    trained_agent.policy.load_state_dict(state_dict)
+    model.policy.load_state_dict(state_dict)
 
 
 # 加载训练好的自动驾驶模型
-
-
-
-# if args.base:#str(args.seed)
-#     defense_model_path = "./logs/eval_def/" + os.path.join("base", args.algo, args.env_name, args.addition_msg, "1")
-# else:
-#     defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.addition_msg,  str(args.train_eps), str(args.seed))
-#
-# # defense_model_path = os.path.join(args.path, args.env_name, args.algo)
-# if args.best_model:
-#     model_path = os.path.join(defense_model_path, 'best_model.zip')
-#     # model_path = os.path.join(defense_model_path, 'best_model/best_model')
-#     #model_path = os.path.join(args.path, args.env_name, args.algo,  'best_model/best_model')
-# else:
-#     #model_path = os.path.join(args.path, args.env_name, args.algo, args.addition_msg, 'lunar')
-#     model_path = os.path.join(defense_model_path, 'lunar')
-# trained_agent = SAC.load(model_path, device=device)
 
 if args.algo == "IGCARL":
     prefix = "./logs/eval_def/" + os.path.join(args.algo, args.env_name)
@@ -106,14 +90,14 @@ elif args.algo == "RARL":
     defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps),
                                                            str(args.seed), str(args.trained_step))
     if args.best_model:
-        model_path = os.path.join(defense_model_path, 'policy_best.pth')
+        model_path = os.path.join(defense_model_path, 'best_model', 'policy_best.pth')
     elif args.eval_best_model:
         model_path = os.path.join(defense_model_path, 'eval_best_model', 'policy_eval_best.pth')
     else:
         model_path = os.path.join(defense_model_path, 'policy.pth')
 
     print("DEBUG def model path: ", model_path)
-    trained_agent = SAC("MlpPolicy", env, verbose=1, device=device)
+    trained_agent = SAC("MlpPolicy", temp_def_env, verbose=1, device=device)
     state_dict = th.load(model_path, map_location=device)
     trained_agent.policy.load_state_dict(state_dict)
 
@@ -262,7 +246,7 @@ for episode in range(args.train_step):
     steps.append(episode_steps)
 
 env.close()
-
+temp_def_env.close()
 # 计算平均奖励和步数
 mean_reward = np.mean(rewards)
 std_reward = np.std(rewards)
@@ -299,7 +283,7 @@ if args.attack:
 
 
 # 定义日志文件路径
-log_file = "eval_attack_log.txt"
+log_file = "eval_attack_log_207.txt"
 
 # 将参数和结果写入日志文件
 with open(log_file, 'a') as f:  # 使用 'a' 模式以追加方式写入文件

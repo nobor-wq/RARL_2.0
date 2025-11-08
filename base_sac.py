@@ -69,7 +69,7 @@ def main():
         env_def_first = DummyVecEnv([make_env(args.seed, 0, False)])
 
     if args.swanlab:
-        run_name = f"base-{args.algo}-{args.seed}-{args.addition_msg}"
+        run_name = f"base-SAC-{args.seed}-{args.addition_msg}"
         run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2)
         # 2025-10-02 wq 初始化训练

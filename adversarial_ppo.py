@@ -165,19 +165,23 @@ class AdversarialDecouplePPO(AdversarialPPO):
 
                 policy_loss_1_a2 = advantages * ratio_a2
                 policy_loss_2_a2 = advantages * th.clamp(ratio_a2, 1 - clip_range, 1 + clip_range)
-                policy_loss_a2 = -th.min(policy_loss_1_a2, policy_loss_2_a2).mean()
+                surrogate_a2 = th.min(policy_loss_1_a2, policy_loss_2_a2)
+                # ---------------------
 
-                # Logging
+                mask = (actions_a1 >= 0).float().to(actions.device)
+                masked_surrogate_a2 = surrogate_a2 * mask
+                mask_count = mask.sum()
+                if mask_count.item() > 0:
+                    policy_loss_a2 = -masked_surrogate_a2.sum() / mask_count
+                    clip_fraction_a2 = (((th.abs(ratio_a2 - 1) > clip_range).float() * mask).sum() / mask_count).item()
+                else:
+                    policy_loss_a2 = th.zeros(1, device=actions.device, dtype=policy_loss_a1.dtype).squeeze()
+                    clip_fraction_a2 = 0.0
+
                 pg_losses.append([policy_loss_a1.item(), policy_loss_a2.item()])
                 clip_fraction_a1 = th.mean((th.abs(ratio_a1 - 1) > clip_range).float()).item()
-                clip_fraction_a2 = th.mean((th.abs(ratio_a2 - 1) > clip_range).float()).item()
                 clip_fractions.append((clip_fraction_a1 + clip_fraction_a2) / 2)
 
-                # 引入掩码：仅在 a1 >= 0 时计算 a2 的损失
-                mask = (actions_a1 >= 0).float().unsqueeze(-1)  # [batch_size, 1]
-                policy_loss_a2 = (policy_loss_a2 * mask).mean()
-
-                # 总策略损失
                 policy_loss = policy_loss_a1 + policy_loss_a2
 
                 if self.clip_range_vf is None:

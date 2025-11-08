@@ -230,11 +230,11 @@ class Traffic_Env(gym.Env):
             action, self.adv_action_mask = action_arr[0].item(), action_arr[1].item()
             if self.adv_action_mask:
                 self.attack_remain -= 1
-                print("DEBUG attack_remain ", self.attack_remain)
+                print("DEBUG attacker attack_remain ", self.attack_remain)
         else:
             if self.adv_action_mask:
                 self.attack_remain -= 1
-                print("DEBUG attack_remain ", self.attack_remain)
+                print("DEBUG defender attack_remain ", self.attack_remain)
             action = action_arr[0]
 
 

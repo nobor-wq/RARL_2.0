@@ -23,28 +23,33 @@ def objective(trial: optuna.trial.Trial, base_args) -> float:
     # Optuna会为每次试验提供不同的值来覆盖 base_args 中的值
     args.lr_def = trial.suggest_categorical("lr_def", [1e-3, 1e-4, 1e-5])
     args.batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
-    args.train_step = trial.suggest_categorical("train_step", [20, 40, 80])
-    args.adv_steps = trial.suggest_int("adv_steps", 3, 6)
-    args.loop_nums = trial.suggest_int("loop_nums", 5, 20)
+    args.train_step = trial.suggest_categorical("train_step", [40, 60, 80])
+    args.adv_steps = trial.suggest_int("adv_steps", 4, 6)
+    args.loop_nums = trial.suggest_int("loop_nums", 5, 15)
     args.lagrangian_eps = trial.suggest_categorical("lagrangian_eps", [0.001, 0.01, 0.1, 1.0, 2.0])
     args.adv_sample_ratio = trial.suggest_categorical("adv_sample_ratio", [0.25, 0.5])
+    # args.kl_coef = trial.suggest_categorical("kl_coef", [0.1, 1.0, 5.0, 10])
+
 
     # --- 固定参数 ---
     # 你在命令行中指定的参数（比如 --cuda_number 1）已经被 cli_args 捕获
     # 如果你还想在这里硬编码一些值，也可以，但从命令行传入更灵活
-    args.swanlab = False  # 优化时可以先关掉日志记录，避免混乱
+
 
     # --- 运行训练并返回结果 ---
     try:
         # 调用我们重构的训练函数，传递最终配置好的 args 对象
         final_reward = run_training(args)
+        print("DEBUG optimize.py final_reward:", final_reward)
+
         return final_reward
     except Exception as e:
         # 如果训练过程中出错 (例如梯度爆炸导致 NaN)，
         # 告诉 Optuna 这是一次失败的试验
         print(f"Trial failed with error: {e}")
         print("Failing args:", args) # 打印出导致失败的参数组合，便于调试
-        return -10000.0  # 返回一个非常差的值
+
+        return -1.0  # 返回一个非常差的值
 
 
 if __name__ == "__main__":

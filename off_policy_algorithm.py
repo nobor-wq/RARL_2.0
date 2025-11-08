@@ -22,7 +22,6 @@ from copy import deepcopy
 
 class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
-    # TODO:这里需要重写一下父文件的_dump_logs
     def _dump_logs(self):
         assert self.ep_info_buffer is not None
         assert self.ep_success_buffer is not None
@@ -87,11 +86,8 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
             # we assume that the policy uses tanh to scale the action
             # We use non-deterministic action in the case of SAC, for TD3, it does not matter
             assert self._last_obs is not None, "self._last_obs was not set"
-            # 2025-09-26 wq 添加攻击
-            # if isinstance(self._last_obs, np.ndarray):
-            #     last_obs_copy = self._last_obs.copy()
-            # else:
-            #     last_obs_copy = deepcopy(self._last_obs)
+
+
             # 拷贝观测（兼容 numpy 和 tensor）
             if isinstance(self._last_obs, np.ndarray):
                 last_obs_copy = self._last_obs.copy()
@@ -128,8 +124,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 attReStep_tensor= th.tensor(attReStep, device=self.device).reshape(1,1)
 
                 obs_adv = th.cat([obs_tensor, attReStep_tensor, actions_tensor], dim=-1)  # -> (batch, 28)
-                # obs_tensor[:, -1] = actions_tensor.squeeze(-1)
-                # TODO:这里是否固定攻击者动作的输出
                 adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=True)
 
             adv_action_mask = (adv_action[:, 0] > 0) & (obs_adv[:, -2].cpu().numpy() > 0)
@@ -144,6 +138,7 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
 
             else:
                 unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
+
 
         # Rescale the action from [low, high] to [-1, 1]
         if isinstance(self.action_space, spaces.Box):
@@ -160,10 +155,6 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
             # Discrete case, no need to normalize or clip
             buffer_action = unscaled_action
             action = buffer_action
-        if adv_action_mask:
-            self.logger.record("def_action_record/action_def_old", actions_tensor.item())
-            self.logger.record("def_action_record/action_adv", adv_action_eps.item())
-            self.logger.record("def_action_record/action_def_new", buffer_action.item())
 
         return adv_action_mask, buffer_action, state_eps
 
@@ -346,18 +337,18 @@ class OffPolicyBaseAlgorithm(OffPolicyAlgorithm):
 
         time_elapsed = max((time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon)
         fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
-        self.logger.record("time_def/episodes", self._episode_num, exclude="tensorboard")
+        self.logger.record("time_pre_def/episodes", self._episode_num, exclude="tensorboard")
         if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
-            self.logger.record("rollout_def/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
-            self.logger.record("rollout_def/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
-        self.logger.record("time_def/fps", fps)
-        self.logger.record("time_def/time_elapsed", int(time_elapsed), exclude="tensorboard")
-        self.logger.record("time_def/total_timesteps", self.num_timesteps, exclude="tensorboard")
+            self.logger.record("rollout_pre_def/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
+            self.logger.record("rollout_pre_def/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+        self.logger.record("time_pre_def/fps", fps)
+        self.logger.record("time_pre_def/time_elapsed", int(time_elapsed), exclude="tensorboard")
+        self.logger.record("time_pre_def/total_timesteps", self.num_timesteps, exclude="tensorboard")
         if self.use_sde:
-            self.logger.record("train_def/std", (self.actor.get_std()).mean().item())
+            self.logger.record("train_pre_def/std", (self.actor.get_std()).mean().item())
 
         if len(self.ep_success_buffer) > 0:
-            self.logger.record("rollout_def/success_rate", safe_mean(self.ep_success_buffer))
+            self.logger.record("rollout_pre_def/success_rate", safe_mean(self.ep_success_buffer))
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
 

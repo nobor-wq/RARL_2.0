@@ -77,10 +77,6 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
             else:
                 adv_action_mask = (clipped_adv_actions[:, 0] > 0) & (obs_tensor[:, -2].cpu().numpy() > 0)
 
-
-            if adv_action_mask:
-                self.logger.record("adv_action_record/action_def_old", actions_tensor.item())
-
             # Generate perturbation into observations to get adv_obs
             final_actions = self.attack_process(obs_tensor, adv_action_mask, clipped_adv_actions, actions)
 
@@ -157,15 +153,6 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
                         terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
                     rewards[idx] += self.gamma * terminal_value
 
-            # TODO: whether to add trajectory padding method
-            # check rollout_buffer type
-            # is_padding_buffer = isinstance(rollout_buffer, (PaddingRolloutBuffer, DecouplePaddingRolloutBuffer))
-            # if is_padding_buffer:
-            #     # 遍历每个环境的 info，处理每条轨迹
-            #     for env_idx, info in enumerate(infos):
-            #         if info.get('flag', False):  # 如果这个环境提前终止（攻击成功）
-            #             rollout_buffer.log_collisions(env_idx=env_idx)  # 支持按环境记录碰撞
-            #             rollout_buffer.return_pos(env_idx=env_idx)  # 返回当前环境的n_steps，用于后续对齐处理
 
             rollout_buffer.add(
                 obs_tensor.cpu().numpy(),  # type: ignore[arg-type]
@@ -217,8 +204,6 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
                 else:
                     adv_action_fromState, _ = self.trained_agent.predict(adv_state.cpu(), deterministic=True)
                     adv_action = adv_action_fromState
-            self.logger.record("adv_action_record/action_adv", selected_adv_actions.item())
-            self.logger.record("adv_action_record/action_def_new", adv_action_fromState.item())
             final_action = actions.copy()
             final_action[attack_idx] = adv_action
         else:
@@ -229,7 +214,6 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
         return output_action
 
     def _dump_logs(self, iteration):
-        super()._dump_logs(iteration)
         if safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]) <= self.max_epi_reward:
             policy_save_path = os.path.join(self.best_model_path, "policy_best.pth")
             os.makedirs(os.path.dirname(policy_save_path), exist_ok=True)

@@ -402,6 +402,7 @@ class DualReplayBufferDefender(ReplayBuffer):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
 
         self.adv_sample_ratio = adv_sample_ratio
+
         adv_buffer_size = int(buffer_size * adv_sample_ratio)
         normal_buffer_size = buffer_size - adv_buffer_size
 
