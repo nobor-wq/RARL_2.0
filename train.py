@@ -82,7 +82,7 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                         swanlab.log({"Eval/agent adv action:": adv_actions[1].item()})
                         swanlab.log({"Eval/agent action after attack:": final_action.item()})
 
-                    print("DEBUG train.py action before attack:", actions, "attack action is: ", adv_actions, "after attack:", final_action)
+                    print("DEBUG train.py final_evaluation action before attack:", actions, "attack action is: ", adv_actions[1], "after attack:", final_action)
                 else:
                     final_action = actions
 
@@ -146,7 +146,7 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
 
 
 
-def create_model_adv(args, env, device, best_model_path):
+def create_model_adv(args, env, device, best_model_path, age_model_path):
     """
     根据 args 配置来创建 基于PPO的敌手模型。
     如果需要 wandb，返回模型时会附带 wandb 配置信息。
@@ -162,13 +162,13 @@ def create_model_adv(args, env, device, best_model_path):
     rollout_buffer_class_adv = DecoupleRolloutBuffer
     ppo_device = 'cpu'
 
-    model = model_class(args, best_model_path,  "MlpPolicy",
+    model = model_class(args, best_model_path, age_model_path,  "MlpPolicy",
                         env, n_steps=args.n_steps, batch_size=args.batch_size, verbose=1,
                         rollout_buffer_class=rollout_buffer_class_adv,
                         device=device)
     return model
 
-def create_model_def(args, env, device, best_model_path):
+def create_model_def(args, env, device, best_model_path, adv_path, trained_age_path):
     """
     根据 args 配置来创建 基于PPO的敌手模型。
     如果需要 wandb，返回模型时会附带 wandb 配置信息。
@@ -201,6 +201,8 @@ def create_model_def(args, env, device, best_model_path):
     model = model_class(
         args,
         best_model_path,
+        adv_path,
+        trained_age_path,
         "MlpPolicy",
         env,
         batch_size=args.batch_size,
@@ -307,9 +309,9 @@ def run_training(args):
         env_adv_last = DummyVecEnv([make_env(args.seed, 0, True)])
 
 
-    eval_env_def = DummyVecEnv([make_env(args.seed + 1000, 0, False)])
-    eval_env_adv = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
-    eval_env_adv_last = DummyVecEnv([make_env(args.seed + 100, 0, True, eval_t=True)])
+    # eval_env_def = DummyVecEnv([make_env(args.seed + 1000, 0, False)])
+    # eval_env_adv = DummyVecEnv([make_env(args.seed + 1000, 0, True, eval_t=True)])
+    # eval_env_adv_last = DummyVecEnv([make_env(args.seed + 100, 0, True, eval_t=True)])
     # 2025-10-26 wq 统一的回调函数列表初始化
     callbacks_common = []
 
@@ -365,8 +367,8 @@ def run_training(args):
         mean_success = final_evaluation(args, trained_agent, model_adv, device, attack=False, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
         final_mean_success = final_evaluation(args, trained_agent, model_adv, device, attack=True, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
 
-        eval_env_def.close()
-        eval_env_adv.close()
+        # eval_env_def.close()
+        # eval_env_adv.close()
 
         th.save(model_adv.policy.state_dict(), os.path.join(eval_adv_log_path, "policy.pth"))
         del model_adv
@@ -375,6 +377,162 @@ def run_training(args):
         if args.algo == "RARL":
             temp_def_env.close()
 
+    else:
+        if args.no_optimize:
+
+            # 2025-10-02 wq 防御者预训练 (Standard SAC)
+            env_def = DummyVecEnv([make_env(args.seed, 0, False)])
+            env_adv = DummyVecEnv([make_env(args.seed, 0, True)])
+
+            model_def_pre = BaseSAC("MlpPolicy", env_def, batch_size=args.batch_size, learning_rate=args.lr_def, verbose=1, device=device)
+            model_def_pre.learn(
+                total_timesteps=args.train_step * args.n_steps ,
+                progress_bar=True,
+                callback=[checkpoint_callback_def] + callbacks_common
+            )
+
+            model_def_pre.save(os.path.join(eval_def_log_path, "0", "lunar"), exclude=["optimizer", "replay_buffer"])
+            del model_def_pre
+
+
+
+            # 2025-11-11 wq 攻击者预训练
+            base_def_path = os.path.join(eval_def_log_path, "0", "lunar")
+            model_adv = create_model_adv(args, env_adv, device, best_model_path_adv, base_def_path)
+
+
+            model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                            callback=[checkpoint_callback_adv] + callbacks_common)
+            model_adv.save(os.path.join(eval_adv_log_path, "0", "lunar"), exclude=["optimizer", "replay_buffer"])
+            del model_adv
+
+
+            for i in range(args.loop_nums):
+
+                print(f"\n{'=' * 15} Loop {i + 1}/{args.loop_nums} {'=' * 15}")
+                # 2025-11-11 wq 防御者训练
+
+                adv_path = os.path.join(eval_adv_log_path, str(i), "lunar")
+                base_def_path = os.path.join(eval_def_log_path, str(i), "lunar")
+                old_model = SAC.load(base_def_path)
+
+                model_def = create_model_def(args, env_def, device, best_model_path_def, adv_path, base_def_path)
+                model_def.policy.load_state_dict(old_model.policy.state_dict())
+                model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                                callback=[checkpoint_callback_def] + callbacks_common)
+                def_path = os.path.join(eval_def_log_path, str(i + 1), "lunar")
+                model_def.save(def_path, exclude=["optimizer", "replay_buffer"])
+
+                del old_model
+
+                # 2025-11-11 wq 攻击者训练
+
+
+                model_adv = create_model_adv(args, env_adv, device, best_model_path_adv, def_path)
+                model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                                callback=[checkpoint_callback_adv] + callbacks_common)
+
+                model_adv.save(os.path.join(eval_adv_log_path, str(i+1), "lunar"), exclude=["optimizer", "replay_buffer"])
+
+                mean_success_noAttack = final_evaluation(args, model_def, model_adv, device, attack=False,
+                                                         is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+                mean_success_attack = final_evaluation(args, model_def, model_adv, device, attack=True,
+                                                       is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+                del model_adv
+                del model_def
+            env_adv.close()
+            env_def.close()
+
+
+            return mean_success_attack
+        else:
+
+            # 2025-10-26 wq 加载专家模型
+            # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
+            defense_model_expert_path = os.path.join(args.path_def, "base", args.algo, args.env_name, "1", "lunar")
+            trained_expert = SAC.load(defense_model_expert_path, device=device)
+
+            # 2025-10-02 wq 防御者预训练 (Standard SAC)
+            model_def = create_model_def(args, env_def, device, best_model_path_def)
+            model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
+
+            # 2025-10-26 wq 初始化占位用的“旧”模型
+            model_old_def = SAC("MlpPolicy", env_def, device=device)  # 只需要结构，不需要训练
+            model_old_adv = PPO("MlpPolicy", env_adv, device=device)  # PPO结构
+
+            for i in range(args.loop_nums):
+                print(f"\n{'=' * 15} Loop {i + 1}/{args.loop_nums} {'=' * 15}")
+
+                # --- 步骤 1: 攻击者训练 ---
+                # 面对当前版本的防御者，先强化攻击者
+                print(f"--- Attacker Training ---")
+
+                model_old_def.policy.load_state_dict(model_def.policy.state_dict())
+                model_old_def.policy.set_training_mode(False)  # 确保是评估模式
+                env_adv.reset()
+
+                model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                                callback=[checkpoint_callback_adv] + callbacks_common,
+                                trained_def=model_old_def, log_interval=args.print_interval, reset_num_timesteps=False)
+
+                print(f"--- Loop {i + 1}/{args.loop_nums} --- attacker training over---")
+
+
+
+                print(f"--- Loop {i + 1}/{args.loop_nums} --- defender training ---")
+                model_old_adv.policy.load_state_dict(model_adv.policy.state_dict())
+                model_old_adv.policy.set_training_mode(False)
+
+                # 2025-10-26 wq 更新旧攻击者用于防御者训练
+                env_def.reset()
+
+                print("Training Defender...")
+                model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
+                                callback=[checkpoint_callback_def] + callbacks_common, trained_agent=model_old_def,
+                                trained_adv=model_old_adv, trained_expert=trained_expert, reset_num_timesteps=False,
+                                log_interval=args.print_interval)
+                print(f"--- Loop {i + 1}/{args.loop_nums} --- defender training over---")
+
+                mean_success_noAttack = final_evaluation(args, model_def, model_adv, device, attack=False, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+                mean_success_attack = final_evaluation(args, model_def, model_adv, device, attack=True, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+
+
+            # 2025-10-26 wq 最后阶段：攻击测试
+            print("=== Phase 3: Final Attack Phase ===")
+            set_seeds(args.seed + 200)
+            # model_old_def.actor.load_state_dict(model_def.actor.state_dict())
+            model_old_def.policy.load_state_dict(model_def.policy.state_dict())
+            model_old_def.policy.set_training_mode(False)
+
+            model_adv_last = create_model_adv(args, env_adv_last, device, best_model_path_adv)
+
+            model_adv_last.learn(total_timesteps=args.train_step * args.n_steps * 10, progress_bar=True,
+                            callback=[checkpoint_callback_adv] + callbacks_common,
+                            trained_def=model_old_def, reset_num_timesteps=True, log_interval=args.print_interval)
+
+            mean_success = final_evaluation(args, model_def, model_adv_last, device, attack=False, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+            final_mean_success = final_evaluation(args, model_def, model_adv_last, device, attack=True, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+
+            # Save the agent
+            # eval_env_def.close()
+            # eval_env_adv.close()
+            # eval_env_adv_last.close()
+
+            th.save(model_adv_last.policy.state_dict(), os.path.join(eval_adv_log_path, "policy.pth"))
+            del model_adv_last
+            env_adv_last.close()
+
+            del model_adv
+            env_adv.close()
+
+            th.save(model_def.policy.state_dict(), os.path.join(eval_def_log_path, "policy.pth"))
+
+            del model_def
+            env_def.close()
+
+            return final_mean_success
+    '''
+    
     else:
         # 2025-10-26 wq 加载专家模型
         # eval_env_adv = make_env(args.seed + 1000, 0, True, eval_t=True)()
@@ -478,10 +636,8 @@ def run_training(args):
         del model_def
         env_def.close()
 
-
-
         return final_mean_success
-
+    '''
 def main():
     # get parameters from config.py
     parser = get_config()

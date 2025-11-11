@@ -35,7 +35,7 @@ class Traffic_Env(gym.Env):
         "render_modes": ["human", "rgb_array"],
     }
 
-    def __init__(self, attack=False, adv_steps=2, eval=False, defense=False, use_gui=False, render_mode=None, darrl=False):
+    def __init__(self, attack=False, adv_steps=2, eval=False, use_gui=False, render_mode=None, darrl=False):
         self.state_dim = 26
         self.action_dim = 1
         self.maxDistance = 200.0
@@ -50,7 +50,6 @@ class Traffic_Env(gym.Env):
         self.attack_remain = adv_steps
         self.attack = attack
         self.eval = eval
-        self.defense = defense
         # For traci multi-client support
         self.label = None
         self.sumo_seed = 0
@@ -62,7 +61,7 @@ class Traffic_Env(gym.Env):
         else:
             self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32)
 
-        if self.attack and not self.defense:
+        if self.attack:
             self.action_space = spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32)
         else:
             self.action_space = spaces.Box(-1.0, 1.0, shape=(1,), dtype=np.float32)
@@ -226,7 +225,7 @@ class Traffic_Env(gym.Env):
         # if action_arr.size >= 2:
         #     flag = True  # 2025-10-06 wq 用来判断返回的动作长度
 
-        if self.attack and not self.defense and not self.darrl:
+        if self.attack and not self.darrl:
             action, self.adv_action_mask = action_arr[0].item(), action_arr[1].item()
             if self.adv_action_mask:
                 self.attack_remain -= 1
@@ -259,18 +258,18 @@ class Traffic_Env(gym.Env):
         info['cost'] = cost
         info['step'] = self.current_step
 
-        if self.attack and not self.defense and self.adv_action_mask and collision_value:
+        if self.attack and self.adv_action_mask and collision_value:
             info['flag'] = True
         self.adv_action_mask = False
-        if self.attack  and not self.defense:
-            if self.eval:
-                return np.array(next_state, dtype=np.float32), cost, collision_value, False, info
-            else:
-                if self.attack_remain == 0:
-                    print("===>Checker-3: Attack times run out!")
-                    return np.array(next_state, dtype=np.float32), cost, collision_value, True, info
-                else:
-                    return np.array(next_state, dtype=np.float32), cost, collision_value, False, info
+        if self.attack or self.eval:
+            # if self.eval:
+            #     return np.array(next_state, dtype=np.float32), cost, collision_value, False, info
+            # else:
+                # if self.attack_remain == 0:
+                #     print("===>Checker-3: Attack times run out!")
+                #     return np.array(next_state, dtype=np.float32), cost, collision_value, True, info
+                # else:
+            return np.array(next_state, dtype=np.float32), cost, collision_value, False, info
         else:
             return np.array(next_state, dtype=np.float32), reward_cost, collision_value, False, info
 

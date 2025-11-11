@@ -103,6 +103,7 @@ def get_config():
     parser.add_argument('--lagrangian_lr', type=float, default=5e-4, help='Learning rate for Lagrangian multiplier')
 
     parser.add_argument('--eval_episode', type=int, default=100, help='number of eval episodes')
+    parser.add_argument('--no_optimize', action='store_true', help='whether to use dual Buffer def')
 
 
     return parser

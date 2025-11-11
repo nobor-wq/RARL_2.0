@@ -1,12 +1,12 @@
 from on_policy_algorithm import OnPolicyAdversarialAlgorithm
 from stable_baselines3.common.utils import explained_variance
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 import torch as th
 import numpy as np
 from gymnasium import spaces
 
 class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
-    def __init__(self, custom_args, best_model_path, *args, **kwargs):
+    def __init__(self, custom_args, best_model_path, age_model_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.best_model = custom_args.best_model
 
@@ -21,7 +21,12 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
         self.attack_method = custom_args.attack_method
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
-        self.trained_agent = None
+
+        if custom_args.algo == "RARL":
+            self.trained_agent = SAC.load(age_model_path, device=self.device)
+
+
+
         self.base_cost = custom_args.base_cost
 
         # # Instantiate the agent
@@ -82,10 +87,7 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
 class AdversarialDecouplePPO(AdversarialPPO):
 
     def learn(self, total_timesteps, callback=None, log_interval=1,
-              tb_log_name='PPO', reset_num_timesteps=True, progress_bar=False, trained_def=None, *args, **kwargs):
-
-        if trained_def is not None:
-            self.trained_agent = trained_def
+              tb_log_name='PPO', reset_num_timesteps=True, progress_bar=False,  *args, **kwargs):
 
         return super().learn(
             total_timesteps=total_timesteps,

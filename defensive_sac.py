@@ -1,5 +1,7 @@
+
+
 from off_policy_algorithm import OffPolicyDefensiveAlgorithm, OffPolicyBaseAlgorithm
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, PPO
 import torch as th
 import numpy as np
 from torch.nn import functional as F
@@ -7,7 +9,7 @@ from stable_baselines3.common.utils import polyak_update
 import torch.optim as optim
 
 class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
-    def __init__(self, custom_args, best_model_path,  *args, **kwargs):
+    def __init__(self, custom_args, best_model_path, adv_path, trained_age_path,  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.best_model = custom_args.best_model
         self.algo = custom_args.algo
@@ -20,9 +22,12 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.attack_method = custom_args.attack_method
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
-        self.trained_adv = None
-        self.trained_agent = None
-        self.trained_expert = None
+        if custom_args.algo == "RARL":
+            self.trained_agent = SAC.load(trained_age_path, device=self.device)
+        if custom_args.algo_adv == "PPO":
+            self.trained_adv = PPO.load(adv_path, device=self.device)
+
+
         self.action_diff = custom_args.action_diff
         self.use_expert = custom_args.use_expert
 
@@ -67,14 +72,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         tb_log_name="SAC",
         reset_num_timesteps=True,
         progress_bar=False,
-        trained_agent=None,
-        trained_adv=None,
-        trained_expert=None,
     ):
-
-        self.trained_agent = trained_agent
-        self.trained_adv = trained_adv
-        self.trained_expert = trained_expert
 
         return super().learn(
             total_timesteps=total_timesteps,
@@ -200,7 +198,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                     # 步骤 2: 计算逐样本的均方误差损失 (约束的基础)
                     # actions_pi 是在扰动状态 obs_used 下的动作
-                    policy_loss_per_sample = F.mse_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
+                    # policy_loss_per_sample = F.mse_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
+                    policy_loss_per_sample = F.l1_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
 
                     # 步骤 3: 准备拉格朗日乘子
                     # 我们在 actor loss 中使用 lambda 的值，但不通过 actor loss 更新 lambda

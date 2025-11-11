@@ -82,32 +82,32 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
 
             new_obs, rewards, dones, infos = env.step(final_actions)
 
-            if isinstance(infos, dict):
-                info1 = infos
-            elif isinstance(infos, (list, tuple)) and len(infos) > 0:
-                info1 = infos[0]
-            else:
-                raise ValueError(f"Invalid infos format: {type(infos)}")
-
-            curr_step = int(info1.get("step", None))
-
-            if curr_step is None:
-                raise ValueError(f"Invalid step format: {curr_step}")
-            # 2025-10-21 wq 对敌手的reward添加惩罚
-            attack_start = 12
-            attack_end = 18
-
-            if not adv_action_mask:
-                if curr_step >= attack_start:
-                    re_c = (curr_step - attack_start) / (attack_end -  attack_start)
-                    rewards -= re_c
-
-            if adv_action_mask:
-                if not dones:
-                    att_remain = new_obs[:, -2]
-                    # attack_cost = base_cost * (1.0 + k * (1.0 - att_remain))
-                    attack_cost = 1.0 - att_remain
-                    rewards = rewards - attack_cost
+            # if isinstance(infos, dict):
+            #     info1 = infos
+            # elif isinstance(infos, (list, tuple)) and len(infos) > 0:
+            #     info1 = infos[0]
+            # else:
+            #     raise ValueError(f"Invalid infos format: {type(infos)}")
+            #
+            # curr_step = int(info1.get("step", None))
+            #
+            # if curr_step is None:
+            #     raise ValueError(f"Invalid step format: {curr_step}")
+            # # 2025-10-21 wq 对敌手的reward添加惩罚
+            # attack_start = 12
+            # attack_end = 18
+            #
+            # if not adv_action_mask:
+            #     if curr_step >= attack_start:
+            #         re_c = (curr_step - attack_start) / (attack_end -  attack_start)
+            #         rewards -= re_c
+            #
+            # if adv_action_mask:
+            #     if not dones:
+            #         att_remain = new_obs[:, -2]
+            #         # attack_cost = base_cost * (1.0 + k * (1.0 - att_remain))
+            #         attack_cost = 1.0 - att_remain
+            #         rewards = rewards - attack_cost
             # breakpoint()
 
             # Get next origin action according next state and insert into next_obs
@@ -218,7 +218,7 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
             policy_save_path = os.path.join(self.best_model_path, "policy_best.pth")
             os.makedirs(os.path.dirname(policy_save_path), exist_ok=True)
             th.save(self.policy.state_dict(), policy_save_path)
-            print(f"✅ 保存策略权重到: {policy_save_path}")
+            print(f" 保存策略权重到: {policy_save_path}")
 
             # self.save(self.best_model_path)
             # self.max_epi_reward = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
