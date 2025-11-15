@@ -94,16 +94,17 @@ def get_config():
     parser.add_argument('--use_expert', action='store_true', help='whether to use expert')
     parser.add_argument('--use_kl', action='store_true', help='whether to use expert')
     parser.add_argument('--kl_coef', type=float, default=1.0, help='epsilon-ball around init state')
-    parser.add_argument('--model_name', default="defender_v258_20250806_1056_4_5_005", help='训练IGCARL攻击者时使用的防御者模型')
     parser.add_argument("--trained_step", type=int, default=80, help="Duration of each frame")
     parser.add_argument('--adv_sample_ratio', type=float, default=0.5, help='epsilon-ball around init state')
     parser.add_argument('--use_DualBuffer', action='store_true', help='whether to use dual Buffer def')
-    parser.add_argument('--use_lagrangian', action='store_true', help='whether to use dual Buffer def')
-    parser.add_argument('--lagrangian_eps', type=float, default= 0.01, help='epsilon-ball around init state')
-    parser.add_argument('--lagrangian_lr', type=float, default=5e-4, help='Learning rate for Lagrangian multiplier')
+    parser.add_argument('--use_lag', action='store_true', help='whether to use dual Buffer def')
+    parser.add_argument('--lag_eps', type=float, default= 0.01, help='epsilon-ball around init state')
+    parser.add_argument('--lag_lr', type=float, default=5e-4, help='Learning rate for Lagrangian multiplier')
 
     parser.add_argument('--eval_episode', type=int, default=100, help='number of eval episodes')
     parser.add_argument('--no_optimize', action='store_true', help='whether to use dual Buffer def')
+
+    parser.add_argument('--model_name', default="policy_weights_1_6.pth", help='训练IGCARL攻击者时使用的防御者模型')
 
 
     return parser

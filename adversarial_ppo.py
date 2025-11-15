@@ -4,9 +4,10 @@ from stable_baselines3 import PPO, SAC
 import torch as th
 import numpy as np
 from gymnasium import spaces
+import gymnasium as gym
 
 class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
-    def __init__(self, custom_args, best_model_path, age_model_path, *args, **kwargs):
+    def __init__(self, custom_args, best_model_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.best_model = custom_args.best_model
 
@@ -21,9 +22,7 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
         self.attack_method = custom_args.attack_method
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
-
-        if custom_args.algo == "RARL":
-            self.trained_agent = SAC.load(age_model_path, device=self.device)
+        self.trained_agent = None
 
 
 
@@ -87,7 +86,25 @@ class AdversarialPPO(OnPolicyAdversarialAlgorithm, PPO):
 class AdversarialDecouplePPO(AdversarialPPO):
 
     def learn(self, total_timesteps, callback=None, log_interval=1,
-              tb_log_name='PPO', reset_num_timesteps=True, progress_bar=False,  *args, **kwargs):
+              tb_log_name='PPO', reset_num_timesteps=True, progress_bar=False, age_model_path=None,  *args, **kwargs):
+
+        if self.algo == "RARL":
+            # eval_rarl = gym.make(custom_args.env_name, attack=False)
+            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
+            # state_dict = th.load(age_model_path, map_location=self.device)
+            #
+            # self.trained_agent.policy.load_state_dict(state_dict)
+            # eval_rarl.close()
+            self.trained_agent = SAC.load(age_model_path, device=self.device)
+        elif self.algo == "SAC":
+            # eval_rarl = gym.make(custom_args.env_name, attack=False)
+            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
+            # state_dict = th.load(age_model_path, map_location=self.device)
+            #
+            # self.trained_agent.policy.load_state_dict(state_dict)
+            # eval_rarl.close()
+            self.trained_agent = SAC.load(age_model_path, device=self.device)
+
 
         return super().learn(
             total_timesteps=total_timesteps,

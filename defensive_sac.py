@@ -1,5 +1,3 @@
-
-
 from off_policy_algorithm import OffPolicyDefensiveAlgorithm, OffPolicyBaseAlgorithm
 from stable_baselines3 import SAC, PPO
 import torch as th
@@ -7,9 +5,10 @@ import numpy as np
 from torch.nn import functional as F
 from stable_baselines3.common.utils import polyak_update
 import torch.optim as optim
+import gymnasium as gym
 
 class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
-    def __init__(self, custom_args, best_model_path, adv_path, trained_age_path,  *args, **kwargs):
+    def __init__(self, custom_args, best_model_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.best_model = custom_args.best_model
         self.algo = custom_args.algo
@@ -22,31 +21,28 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.attack_method = custom_args.attack_method
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
-        if custom_args.algo == "RARL":
-            self.trained_agent = SAC.load(trained_age_path, device=self.device)
-        if custom_args.algo_adv == "PPO":
-            self.trained_adv = PPO.load(adv_path, device=self.device)
+        self.trained_agent = None
+        self.trained_expert = None
+        self.trained_adv = None
 
 
-        self.action_diff = custom_args.action_diff
-        self.use_expert = custom_args.use_expert
-
-
-        self.kl_div =  custom_args.use_kl
-        # 2025-11-01 wq TODO kl系数调整
-        self.kl_coef = custom_args.kl_coef if hasattr(custom_args, 'kl_coef') else 10.0
-        self.use_lagrangian = custom_args.use_lagrangian if hasattr(custom_args, 'use_lagrangian') else False
-
-        if self.use_lagrangian:
-            # 约束的阈值
-            self.eps2 = custom_args.lagrangian_eps if hasattr(custom_args, 'lagrangian_eps') else 0.05
-            # 拉格朗日乘子的学习率
-            lam_lr = custom_args.lagrangian_lr if hasattr(custom_args, 'lagrangian_lr') else 1e-4
-
-            # 我们优化 log(lambda) 来保证 lambda > 0
-            self.log_lam2 = th.zeros(1, requires_grad=True, device=self.device)
-            self.lam2_optimizer = optim.Adam([self.log_lam2], lr=lam_lr)
-
+        self.action_diff = custom_args.action_diff if hasattr(custom_args, 'action_diff') else False
+        if self.action_diff:
+            self.use_expert = custom_args.use_expert if hasattr(custom_args, 'use_expert') else False
+            self.use_kl =  custom_args.use_kl if hasattr(custom_args, 'use_kl') else False
+            self.use_lag = custom_args.use_lag if hasattr(custom_args, 'use_lag') else False
+            if self.use_lag:
+                # 约束的阈值
+                self.eps2 = custom_args.lag_eps if hasattr(custom_args, 'lag_eps') else 0.05
+                # 拉格朗日乘子的学习率
+                lam_lr = custom_args.lag_lr if hasattr(custom_args, 'lag_lr') else 1e-4
+                # 我们优化 log(lambda) 来保证 lambda > 0
+                self.log_lam2 = th.zeros(1, requires_grad=True, device=self.device)
+                self.lam2_optimizer = optim.Adam([self.log_lam2], lr=lam_lr)
+            elif self.use_kl:
+                self.kl_coef = custom_args.kl_coef if hasattr(custom_args, 'kl_coef') else 10.0
+            else:
+                self.action_diff_coef = custom_args.action_diff_coef if hasattr(custom_args, 'action_diff_coef') else 5.0
 
         # 2025-09-23 wq 加载敌手和防御者
         # if self.best_model:
@@ -72,7 +68,26 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         tb_log_name="SAC",
         reset_num_timesteps=True,
         progress_bar=False,
+        trained_age_path=None,
+        adv_path=None,
     ):
+
+        if self.algo == "RARL":
+            self.trained_agent = SAC.load(trained_age_path, device=self.device)
+
+            # eval_rarl = gym.make(custom_args.env_name, attack=False)
+            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
+            # state_dict = th.load(trained_age_path, map_location=self.device)
+            #
+            # self.trained_agent.policy.load_state_dict(state_dict)
+            # eval_rarl.close()
+        if self.algo_adv == "PPO":
+            self.trained_adv = PPO.load(adv_path, device=self.device)
+            # eval_ppo = gym.make(custom_args.env_name, attack=True)
+            # self.trained_adv = PPO("MlpPolicy", eval_ppo, verbose=1, device=self.device)
+            # state_dict = th.load(adv_path, map_location=self.device)
+            # self.trained_adv.policy.load_state_dict(state_dict)
+            # eval_ppo.close()
 
         return super().learn(
             total_timesteps=total_timesteps,
@@ -105,6 +120,10 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
             obs = replay_data.observations
             obs_eps = replay_data.observations_eps
             obs_is_per = replay_data.obs_is_perturbed
+            # print("DEBUG defensive_sac.py train() obs:", obs, " shape:", obs.shape)
+            # print("DEBUG defensive_sac.py train() obs_eps:", obs_eps, " shape:", obs_eps.shape)
+            # print("DEBUG defensive_sac.py train() obs_is_per:", obs_is_per, " shape:", obs_is_per.shape)
+
             obs_used = th.where(obs_is_per, obs_eps, obs)
 
             # We need to sample because `log_std` may have changed between two gradient steps
@@ -165,11 +184,9 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss_policy = (ent_coef * log_prob - min_qf_pi).mean()
 
-
-
             if self.action_diff:
                 target_agent = self.trained_expert if self.use_expert else self.trained_agent
-                if self.kl_div:
+                if self.use_kl:
                     # 步骤 1: 获取专家在“干净”状态下的策略分布
                     with th.no_grad():
                         mean_actions_expert, log_std_expert, _ = target_agent.policy.actor.get_action_dist_params(obs)
@@ -190,11 +207,12 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     actor_loss = actor_loss_policy + self.kl_coef * kl_loss_masked
 
                     self.logger.record("train_def/self.kl_coef_kl_loss_masked", (self.kl_coef * kl_loss_masked).item())
-                elif self.use_lagrangian:
+                elif self.use_lag:
                     # 步骤 1: 计算“安全”动作 (在干净状态 obs 下的动作)
                     with th.no_grad():
                         # 使用 action_log_prob 获取采样动作，与 actions_pi 保持一致
-                        actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
+                        # actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
+                        actions_clean_np, _ = self.predict(obs.cpu(), deterministic=True)
                         actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                     # 步骤 2: 计算逐样本的均方误差损失 (约束的基础)
                     # actions_pi 是在扰动状态 obs_used 下的动作
@@ -210,7 +228,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     mask = obs_is_per.view(-1)
                     # 将 policy_loss 应用于被扰动的样本，未扰动的损失为0
                     masked_policy_loss = policy_loss_per_sample[mask]
-
+                    # print("DEBUG defensive_sac.py train() masked_policy_loss:", masked_policy_loss, " shape:", masked_policy_loss.shape, " mean: ", masked_policy_loss.detach().mean())
                     # 将约束项加到 actor loss 中
                     # 注意：这里需要确保 actor_loss_policy 也只在 mask 上应用 lagrangian loss
                     # 一个简单的实现是先计算 mean，然后加起来
@@ -228,12 +246,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     self.actor.optimizer.step()
 
                     # 步骤 6: 更新 Lambda (Dual Update)
-                    # 只有在存在被扰动样本时，才进行 lambda 更新
-                    # 这是梯度上升，通过最小化负的目标函数实现
-                    # 我们不希望梯度流回 actor，所以 detach g2
-                    with th.no_grad():  # 这里不需要梯度
-                        constraint_violation = policy_loss_per_sample - self.eps2
-                        masked_violation = constraint_violation[mask]
+                    constraint_violation = policy_loss_per_sample - self.eps2
+                    masked_violation = constraint_violation[mask]
                     if masked_violation.numel() > 0:
                         # 最小化 -log(lambda) * g，等价于最大化 log(lambda) * g
                         lambda_loss = -(self.log_lam2 * masked_violation.detach()).mean()
@@ -241,7 +255,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                         self.lam2_optimizer.zero_grad()
                         lambda_loss.backward()
                         self.lam2_optimizer.step()
-                        self.log_lam2.data.clamp_(-5, 10)  # 裁剪 log-lambda 的值
+                        self.log_lam2.data.clamp_(-5, 5)  # 裁剪 log-lambda 的值
 
                     # 记录 lam2 的值，方便监控
                     self.logger.record("train_def/lambda2", self.log_lam2.exp().item())
@@ -250,25 +264,30 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     actor_losses.append(actor_loss.item())
                 else:
                     with th.no_grad():
+                        # 使用 action_log_prob 获取采样动作，与 actions_pi 保持一致
                         actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
-                    actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
-                    per_elem_sq = (actions_clean - actions_pi) ** 2
-                    per_sample_mse = per_elem_sq.mean(dim=1)
-                    mask = obs_is_per.to(device=per_sample_mse.device)
-                    if mask.dtype.is_floating_point:
-                        mask = mask > 0.5
-                    else:
-                        mask = mask.bool()
-                    mask = mask.view(-1)
-                    mask_float = mask.to(dtype=per_sample_mse.dtype)
-                    masked_per_sample = per_sample_mse * mask_float  # (B,)
-                    action_loss_masked = masked_per_sample.mean()
-                    actor_loss = actor_loss_policy + action_loss_masked * 10
-                    self.logger.record("train_def/action_loss_masked_10", (action_loss_masked * 10).item())
+                        actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
+                    policy_loss_per_sample = F.l1_loss(actions_pi, actions_clean, reduction='none').mean(dim=1).squeeze()
+
+                    # 步骤 4: 计算 Actor Loss (Primal Objective)
+                    # 只对被扰动的样本施加约束
+                    mask = obs_is_per.view(-1)
+                    # 将 policy_loss 应用于被扰动的样本，未扰动的损失为0
+                    masked_policy_loss = policy_loss_per_sample[mask]
+
+                    # 将约束项加到 actor loss 中
+                    # 注意：这里需要确保 actor_loss_policy 也只在 mask 上应用 lagrangian loss
+                    # 一个简单的实现是先计算 mean，然后加起来
+                    penalty = th.tensor(0.0, device=self.device)
+                    if masked_policy_loss.numel() > 0:
+                        penalty = (self.action_diff_coef * masked_policy_loss).mean()
+
+                    actor_loss = actor_loss_policy + penalty
+                    self.logger.record("train_def/action_diff", (self.action_diff_coef * masked_policy_loss).mean().item())
             else:
                 actor_loss = actor_loss_policy
 
-            if not self.use_lagrangian:
+            if not self.use_lag:
                 actor_losses.append(actor_loss.item())
                 # Optimize the actor
                 self.actor.optimizer.zero_grad()

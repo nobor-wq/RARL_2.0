@@ -261,7 +261,7 @@ class Traffic_Env(gym.Env):
         if self.attack and self.adv_action_mask and collision_value:
             info['flag'] = True
         self.adv_action_mask = False
-        if self.attack or self.eval:
+        if self.attack:
             # if self.eval:
             #     return np.array(next_state, dtype=np.float32), cost, collision_value, False, info
             # else:

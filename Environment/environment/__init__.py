@@ -7,7 +7,7 @@ register(id='TrafficEnv2-v0', entry_point='Environment.environment.env2.traffic_
          kwargs={'attack': False, 'adv_steps': 2, 'eval': False})
 
 register(id='TrafficEnv3-v0', entry_point='Environment.environment.env3.traffic_env:Traffic_Env',
-         kwargs={'attack': False, 'adv_steps': 2, 'eval': False, 'defense': False, 'use_gui': False, 'render_mode': None})
+         kwargs={'attack': False, 'adv_steps': 2, 'eval': False, 'use_gui': False, 'render_mode': None})
 
 register(id='TrafficEnv4-v0', entry_point='Environment.environment.env4.traffic_env:Traffic_Env',
          kwargs={'attack': False, 'adv_steps': 2, 'eval': False})

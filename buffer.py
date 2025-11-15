@@ -403,32 +403,29 @@ class DualReplayBufferDefender(ReplayBuffer):
 
         self.adv_sample_ratio = adv_sample_ratio
 
+
+
         adv_buffer_size = int(buffer_size * adv_sample_ratio)
         normal_buffer_size = buffer_size - adv_buffer_size
 
         self.normal_buffer_size = max(normal_buffer_size // n_envs, 1)
         self.adv_buffer_size = max(adv_buffer_size // n_envs, 1)
 
-        # 不再需要 optimize_memory_usage, 因为Tensor操作不兼容
         # --- 为正常样本创建独立的Tensor ---
-        self.normal_observations = th.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape),
-                                            device=self.device, dtype=th.float32)
+        self.normal_observations = th.zeros((self.normal_buffer_size, self.n_envs, *self.obs_shape), device=self.device, dtype=th.float32)
         self.normal_next_observations = th.zeros_like(self.normal_observations)
-        self.normal_actions = th.zeros((self.normal_buffer_size, self.n_envs, self.action_dim), device=self.device,
-                                       dtype=th.float32)
+        self.normal_actions = th.zeros((self.normal_buffer_size, self.n_envs, self.action_dim), device=self.device, dtype=th.float32)
         self.normal_rewards = th.zeros((self.normal_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
         self.normal_dones = th.zeros((self.normal_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
-
+        self.normal_timeouts = th.zeros((self.normal_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
         # --- 为对抗样本创建独立的Tensor ---
-        self.adv_observations = th.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape), device=self.device,
-                                         dtype=th.float32)
+        self.adv_observations = th.zeros((self.adv_buffer_size, self.n_envs, *self.obs_shape), device=self.device, dtype=th.float32)
         self.adv_observations_eps = th.zeros_like(self.adv_observations)
         self.adv_next_observations = th.zeros_like(self.adv_observations)
-        self.adv_actions = th.zeros((self.adv_buffer_size, self.n_envs, self.action_dim), device=self.device,
-                                    dtype=th.float32)
+        self.adv_actions = th.zeros((self.adv_buffer_size, self.n_envs, self.action_dim), device=self.device, dtype=th.float32)
         self.adv_rewards = th.zeros((self.adv_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
         self.adv_dones = th.zeros((self.adv_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
-
+        self.adv_timeouts = th.zeros((self.adv_buffer_size, self.n_envs), device=self.device, dtype=th.float32)
         self.normal_pos = 0
         self.normal_full = False
         self.adv_pos = 0
@@ -455,7 +452,7 @@ class DualReplayBufferDefender(ReplayBuffer):
         # --- 核心改动：根据标志位将数据路由到正确的缓冲区 ---
         if np.any(obs_is_per):
             if obs_eps is None:
-                obs_eps = obs.clone()
+                raise ValueError("obs_eps cannot be None for a perturbed observation.")
             else:
                 obs_eps = self.to_torch(obs_eps)
 
@@ -465,6 +462,11 @@ class DualReplayBufferDefender(ReplayBuffer):
             self.adv_actions[self.adv_pos] = action
             self.adv_rewards[self.adv_pos] = reward
             self.adv_dones[self.adv_pos] = done
+
+            if self.handle_timeout_termination:
+                timeouts = th.tensor([info.get("TimeLimit.truncated", False) for info in infos], device=self.device, dtype=th.float32)
+                self.adv_timeouts[self.adv_pos] = timeouts
+
 
             self.adv_pos += 1
             if self.adv_pos == self.adv_buffer_size:
@@ -476,6 +478,9 @@ class DualReplayBufferDefender(ReplayBuffer):
             self.normal_actions[self.normal_pos] = action
             self.normal_rewards[self.normal_pos] = reward
             self.normal_dones[self.normal_pos] = done
+            if self.handle_timeout_termination:
+                timeouts = th.tensor([info.get("TimeLimit.truncated", False) for info in infos], device=self.device, dtype=th.float32)
+                self.normal_timeouts[self.normal_pos] = timeouts
 
             self.normal_pos += 1
             if self.normal_pos == self.normal_buffer_size:
@@ -519,6 +524,8 @@ class DualReplayBufferDefender(ReplayBuffer):
             adv_batch_inds = th.randint(0, adv_size, (adv_samples_to_take,), device=self.device)
         else:
             adv_batch_inds = th.tensor([], dtype=th.long, device=self.device)
+        # print("DEBUG buffer.py sample: normal_batch_inds =", normal_batch_inds, "adv_batch_inds =", adv_batch_inds)
+        # print("DEBUG buffer.py sample: normal_size =", normal_size, "adv_size =", adv_size)
 
         return self._get_samples(normal_batch_inds, adv_batch_inds, env=env)
 
@@ -540,7 +547,15 @@ class DualReplayBufferDefender(ReplayBuffer):
             normal_obs = self.normal_observations[normal_batch_inds, normal_env_indices, :]
             normal_next_obs = self.normal_next_observations[normal_batch_inds, normal_env_indices, :]
             normal_actions = self.normal_actions[normal_batch_inds, normal_env_indices, :]
-            normal_dones = self.normal_dones[normal_batch_inds, normal_env_indices].reshape(-1, 1)
+
+            normal_dones_raw = self.normal_dones[normal_batch_inds, normal_env_indices]
+            if self.handle_timeout_termination:
+                normal_timeouts_sample = self.normal_timeouts[normal_batch_inds, normal_env_indices]
+                normal_dones = (normal_dones_raw * (1 - normal_timeouts_sample)).reshape(-1, 1)
+            else:
+                normal_dones = normal_dones_raw.reshape(-1, 1)
+
+            # normal_dones = self.normal_dones[normal_batch_inds, normal_env_indices].reshape(-1, 1)
             normal_rewards = self.normal_rewards[normal_batch_inds, normal_env_indices].reshape(-1, 1)
             # 正常样本没有扰动，obs_eps就是obs
             normal_obs_eps = normal_obs
@@ -563,7 +578,14 @@ class DualReplayBufferDefender(ReplayBuffer):
             adv_obs = self.adv_observations[adv_batch_inds, adv_env_indices, :]
             adv_next_obs = self.adv_next_observations[adv_batch_inds, adv_env_indices, :]
             adv_actions = self.adv_actions[adv_batch_inds, adv_env_indices, :]
-            adv_dones = self.adv_dones[adv_batch_inds, adv_env_indices].reshape(-1, 1)
+            adv_dones_raw = self.adv_dones[adv_batch_inds, adv_env_indices]
+            if self.handle_timeout_termination:
+                adv_timeouts_sample = self.adv_timeouts[adv_batch_inds, adv_env_indices]
+                adv_dones = (adv_dones_raw * (1 - adv_timeouts_sample)).reshape(-1, 1)
+            else:
+                adv_dones = adv_dones_raw.reshape(-1, 1)
+
+            # adv_dones = self.adv_dones[adv_batch_inds, adv_env_indices].reshape(-1, 1)
             adv_rewards = self.adv_rewards[adv_batch_inds, adv_env_indices].reshape(-1, 1)
             adv_obs_eps = self.adv_observations_eps[adv_batch_inds, adv_env_indices, :]
             # 扰动标志为True
@@ -588,12 +610,20 @@ class DualReplayBufferDefender(ReplayBuffer):
         obs_eps = th.cat((normal_obs_eps, adv_obs_eps), dim=0)
         obs_is_per = th.cat((normal_is_per, adv_is_per), dim=0)
 
-        # Normalize obs and rewards if needed (this part is tricky and often better handled outside the buffer)
-        # For simplicity, we assume normalization is handled by VecNormalize wrapper if used
-        # if env is not None:
-        #     obs = self._normalize_obs(obs, env)
-        #     next_obs = self._normalize_obs(next_obs, env)
-        #     rewards = self._normalize_reward(rewards, env)
+        # 2025-11-15 wq 打乱
+        batch_size = obs.shape[0]
+        # 创建一个从 0 到 batch_size-1 的随机排列索引
+        shuffled_indices = th.randperm(batch_size, device=self.device)
+
+        # 使用这个随机索引来重新排列所有的数据
+        obs = obs[shuffled_indices]
+        next_obs = next_obs[shuffled_indices]
+        actions = actions[shuffled_indices]
+        dones = dones[shuffled_indices]
+        rewards = rewards[shuffled_indices]
+        obs_eps = obs_eps[shuffled_indices]
+        obs_is_per = obs_is_per[shuffled_indices]
+
 
         return ReplayBufferSamples(
             observations=obs,
