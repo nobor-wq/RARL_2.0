@@ -7,7 +7,7 @@ import gymnasium as gym
 from stable_baselines3.common.monitor import Monitor
 import swanlab
 import Environment.environment
-from stable_baselines3 import PPO, SAC
+from stable_baselines3 import PPO, SAC, TD3
 from callback import CustomEvalCallback_adv, CustomEvalCallback_def
 import random
 from buffer import DecoupleRolloutBuffer, ReplayBufferDefender, DualReplayBufferDefender
@@ -15,10 +15,84 @@ from adversarial_ppo import AdversarialDecouplePPO
 from defensive_sac import DefensiveSAC, BaseSAC
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import os
+import glob
 from swanlab.integration.sb3 import SwanLabCallback
 from policy import IGCARLNet
 from stable_baselines3.common.utils import obs_as_tensor
 from fgsm import FGSM_v2
+from SAC_lag.SAC_Agent_Continuous import SAC_Lag
+
+
+class SACLagPolicyAdapter(th.nn.Module):
+    """让自定义 SAC_Lag 策略在 FGSM、predict 接口下表现得像 SB3 模型。"""
+
+    def __init__(self, agent: SAC_Lag):
+        super().__init__()
+        self.agent = agent
+
+    def _prepare_obs(self, obs_tensor):
+        if not isinstance(obs_tensor, th.Tensor):
+            obs_tensor = th.as_tensor(obs_tensor, dtype=th.float32, device=self.agent.device)
+        else:
+            obs_tensor = obs_tensor.to(self.agent.device)
+        if obs_tensor.dim() == 1:
+            obs_tensor = obs_tensor.unsqueeze(0)
+        return obs_tensor
+
+    def forward(self, obs_tensor, deterministic=True):
+        obs_tensor = self._prepare_obs(obs_tensor)
+        if deterministic:
+            mean, _ = self.agent.policy.forward(obs_tensor)
+            action = th.tanh(mean)
+        else:
+            action, _, _ = self.agent.policy.sample(obs_tensor)
+        return action, None
+
+
+class SACLagSB3Wrapper:
+    """
+    让 SAC_Lag 看起来像 SB3 模型，提供 predict/device/policy 等属性，
+    便于现有对抗训练和 FGSM 攻击逻辑复用。
+    """
+
+    def __init__(self, agent: SAC_Lag):
+        self.agent = agent
+        self.device = agent.device
+        self.policy = SACLagPolicyAdapter(agent)
+
+    def predict(self, observation, deterministic=True):
+        obs_tensor = th.as_tensor(observation, dtype=th.float32, device=self.device)
+        if obs_tensor.dim() == 1:
+            obs_tensor = obs_tensor.unsqueeze(0)
+        action, _ = self.policy(obs_tensor, deterministic=deterministic)
+        action_np = action.squeeze(0).detach().cpu().numpy()
+        return action_np, None
+
+
+def _resolve_sac_lag_checkpoint(args):
+    """
+    根据 env/algo/seed(/addition_msg) 自动寻找最新的 sac_lag checkpoint。
+    """
+    base_dir = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed))
+    search_dirs = []
+    if args.addition_msg:
+        search_dirs.append(os.path.join(base_dir, args.addition_msg))
+    search_dirs.append(base_dir)
+
+    candidates = []
+    for directory in search_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for pattern in ("sac_lag_*.pt", "sac_lag_*.pth"):
+            candidates.extend(glob.glob(os.path.join(directory, pattern)))
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"未在以下目录找到 sac_lag_*.pt/pth: {search_dirs}"
+        )
+
+    candidates.sort(key=os.path.getmtime, reverse=True)
+    return candidates[0]
 
 def final_evaluation(args, final_defender, final_attacker, device, attack, is_swanlab, eval_episode=200):
     """
@@ -49,7 +123,7 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
     # 2025-11-04 wq 成功率，奖励，攻击成功率，平均攻击次数
     attack_sn = 0
     total_attack_times = 0
-
+    mean_attack_success = 0.0
 
     for _ in range(num_eval_episodes):
         obs, _ = eval_env.reset(options="random")
@@ -61,7 +135,10 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
             if attack:
                 # 防御者生成原始动作
                 with th.no_grad():
-                    actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
+                    if isinstance(final_defender, IGCARLNet):
+                        actions, std, _action = final_defender(obs_tensor[:-2])
+                    else:
+                        actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
                 actions_tensor = th.tensor(actions, device=obs_tensor.device)  # 确保在同一设备上
                 obs_tensor[-1] = actions_tensor
                 # 攻击者生成攻击动作
@@ -69,12 +146,17 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                     adv_actions, _ = final_attacker.predict(obs_tensor.cpu(), deterministic=True)
 
                 adv_action_mask = (adv_actions[0] > 0) & (obs[-2] > 0)
+                if args.unlimited_attack:
+                    adv_action_mask = np.ones_like(adv_action_mask, dtype=bool)
                 # print("DEBUG train.py adv_action_mask:", adv_action_mask, "adv_actions:", adv_actions, "obs[-2]:", obs[-2])
 
                 if adv_action_mask.any():
                     adv_state = FGSM_v2(adv_actions[1], victim_agent=final_defender,
                                         last_state=obs_tensor[:-2].unsqueeze(0), epsilon=args.attack_eps, device=device)
-                    action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
+                    if isinstance(final_defender, IGCARLNet):
+                        action_perturbed, std, _action = final_defender(adv_state)
+                    else:
+                        action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
                     final_action = action_perturbed
                     total_attack_times += 1
                     if is_swanlab:
@@ -86,8 +168,19 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                 else:
                     final_action = actions
 
-                # 组合最终动作并与环境交互
-                action = np.column_stack((final_action, adv_action_mask))
+                # 组合最终动作并与环境交互（确保 numpy 类型）
+                if isinstance(final_action, th.Tensor):
+                    final_action_np = final_action.detach().cpu().numpy()
+                else:
+                    final_action_np = np.asarray(final_action)
+
+                adv_mask_np = adv_action_mask
+                if isinstance(adv_action_mask, th.Tensor):
+                    adv_mask_np = adv_action_mask.detach().cpu().numpy()
+                else:
+                    adv_mask_np = np.asarray(adv_action_mask)
+
+                action = np.column_stack((final_action_np, adv_mask_np))
                 obs, reward, done, terminate, info = eval_env.step(action)
 
                 if adv_action_mask.any() and done is True:
@@ -106,7 +199,10 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                 episode_reward += r_def - c_def
             else:
                 with th.no_grad():
-                    actions, _ = final_defender.predict(obs_tensor.cpu(), deterministic=True)
+                    if isinstance(final_defender, IGCARLNet):
+                        actions, std, _action = final_defender(obs_tensor)
+                    else:
+                        actions, _ = final_defender.predict(obs_tensor.cpu(), deterministic=True)
                 obs, reward, done, terminate, info = eval_env.step(actions)
                 episode_reward += reward
             if done:
@@ -142,7 +238,7 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
             print(f"--- Final Evaluation Result: Mean Reward = {mean_reward:.2f} ---")
             print(f"--- Final Evaluation Result: Success Rate = {mean_success:.2f} ---\n")
 
-    return mean_success
+    return mean_success, mean_attack_success
 
 
 
@@ -168,7 +264,7 @@ def create_model_adv(args, env, device, best_model_path):
                         device=device)
     return model
 
-def create_model_def(args, env, device, best_model_path):
+def create_model_def(args, env, device, best_model_path, expert_path):
     """
     根据 args 配置来创建 基于PPO的敌手模型。
     如果需要 wandb，返回模型时会附带 wandb 配置信息。
@@ -201,6 +297,7 @@ def create_model_def(args, env, device, best_model_path):
     model = model_class(
         args,
         best_model_path,
+        expert_path,
         "MlpPolicy",
         env,
         batch_size=args.batch_size,
@@ -216,42 +313,58 @@ def create_model_def(args, env, device, best_model_path):
 
 
 def run_training(args):
-    # get parameters from config.py
-    # parser = get_config()
-    # args = parser.parse_args()
 
-    msg_parts = []
-    if args.action_diff:
-        msg_parts.append("action_diff")
-        if args.use_expert:
-            msg_parts.append("expert")
-        # 依赖于 expert 的技术，可以进行嵌套
-        if args.use_kl:
-            msg_parts.append("kl")
-        elif args.use_lag:
-            msg_parts.append("lag")
-        # 新增的 Buffer 技术
-    if args.use_DualBuffer:
-        msg_parts.append("DualBuffer")
-    if not msg_parts:
-        # 如果没有任何特殊技术，就是一个基础版本
-        addition_msg = "base"
-    else:
-        addition_msg = "_".join(msg_parts)
+    hyperparameters_to_track = {
+        # --- 布尔类型的开关 (如果为 True, 则只显示名字) ---
+        'action_diff': 'action_diff',
+        'expert': 'use_expert',
+        'lag': 'use_lag',
+        'DualBuffer': 'use_DualBuffer',
 
-    # (可选但推荐) 将生成的消息存回args，方便后续使用
-    args.addition_msg = addition_msg
+        # --- 带值的参数 (会显示为 '名字-值' 的格式) ---
+        'eps': 'attack_eps',
+        'steps': 'train_step',
+        'adv_ratio': 'adv_sample_ratio',
+        'lag_eps': 'lag_eps',
+        'batch': 'batch_size'
 
+    }
 
-    print(f"[*] 本次实验标签: {args.addition_msg}")  # 打印出来方便确认
+    def generate_experiment_name(args, params_map):
+        """
+        根据args和配置字典，自动生成一个描述性的实验文件夹名。
+        """
+        name_parts = []
+        for name, attr in params_map.items():
+            if hasattr(args, attr):
+                value = getattr(args, attr)
+
+                # 对布尔类型的开关进行处理
+                if isinstance(value, bool):
+                    if value:
+                        name_parts.append(name)
+                # 对其他所有带值的参数进行处理
+                else:
+                    name_parts.append(f"{name}-{value}")
+
+        if not name_parts:
+            return "base_experiment"  # 如果没有任何特殊参数，返回一个默认名
+
+        return "_".join(name_parts)
+
+    # ==============================================================================
+    # 2. 调用函数生成实验名，并创建路径
+    # ==============================================================================
+    experiment_name = generate_experiment_name(args, hyperparameters_to_track)
+
+    print(f"[*] 本次实验标签: {experiment_name}")
+
     # defenfer and attacker log path
-    eval_def_log_path = os.path.join(args.path_def, args.algo, args.env_name, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
-    os.makedirs(eval_def_log_path, exist_ok=True)
-    best_model_path_def = os.path.join(eval_def_log_path, "best_model")
-
-    eval_adv_log_path = os.path.join(args.path_adv, args.algo_adv, args.env_name,  args.algo, args.addition_msg, str(args.attack_eps), str(args.seed), str(args.train_step))
-    os.makedirs(eval_adv_log_path, exist_ok=True)
-    best_model_path_adv = os.path.join(eval_adv_log_path, "best_model")
+    if not args.adv_test:
+        log_path = os.path.join("logs", args.env_name, args.algo, experiment_name, str(args.seed))
+        os.makedirs(log_path, exist_ok=True)
+        best_model_path_def = os.path.join(log_path, "best_model", "def")
+        best_model_path_adv = os.path.join(log_path, "best_model", "adv")
 
     # 设置设备
     if args.use_cuda and th.cuda.is_available():
@@ -275,13 +388,14 @@ def run_training(args):
 
     set_seeds(args.seed)
     # 2025-10-01 wq 模型保存地址
-    model_path_def = os.path.join(eval_def_log_path, 'model')
-    os.makedirs(model_path_def, exist_ok=True)
-    checkpoint_callback_def = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_def)
+    if not args.adv_test:
+        model_path_def = os.path.join(log_path, "model", 'def')
+        os.makedirs(model_path_def, exist_ok=True)
+        checkpoint_callback_def = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_def)
 
-    model_path_adv = os.path.join(eval_adv_log_path, 'model')
-    os.makedirs(model_path_adv, exist_ok=True)
-    checkpoint_callback_adv = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
+        model_path_adv = os.path.join(log_path, "model", 'adv')
+        os.makedirs(model_path_adv, exist_ok=True)
+        checkpoint_callback_adv = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
 
     def make_env(seed, rank, attack, eval_t=False):
         def _init():
@@ -304,13 +418,12 @@ def run_training(args):
 
     # 2025-10-26 wq 统一的回调函数列表初始化
     callbacks_common = []
-    run_id = None
 
     if args.swanlab:
         if args.adv_test:
             run_name = f"attacker-only-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}-{args.train_step}"
         else:
-            run_name = f"{args.attack_method}-{args.algo}-{args.seed}-{args.attack_eps}-{args.addition_msg}-{args.train_step}"
+            run_name = f"{experiment_name}_seed-{args.seed}"
 
         run = swanlab.init(project="RARL", name=run_name, config=args)
         swan_cb = SwanLabCallback(project="RARL", experiment_name=run_name, verbose=2, log_interval=100)
@@ -327,49 +440,60 @@ def run_training(args):
             model_def = IGCARLNet(state_dim=26, action_dim=1).to(device)
             model_def.load_state_dict(th.load(model_path_drl, map_location=device))
             model_def.eval()
+        elif args.algo == 'DARRL':
+            model_path = IGCARLNet(26, 1)
+            score = f"policy2000_actor"
+            model_path_drl = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), score) + '.pth'
+            state_dict = th.load(model_path_drl, map_location=device)
+            model_path.load_state_dict(state_dict)
+            model_path.eval()
+            model_path.to(device)  # 再次确保
+            trained_agent = model_path
+        elif args.algo == "SAC_lag":
+            ckpt_path = _resolve_sac_lag_checkpoint(args)
+            print("DEBUG def model path: ", ckpt_path)
+            lag_agent = SAC_Lag(state_dim=args.state_dim, action_dim=args.action_dim, device=device)
+            lag_agent.load_actor(ckpt_path)
+            trained_agent = SACLagSB3Wrapper(lag_agent)
+            model_path = trained_agent
         elif args.algo == "RARL":
-            # defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps), str(args.trained_seed), str(args.trained_step))
-            model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, args.model_name)
-
-            # if args.best_model:
-            #     model_path = os.path.join(defense_model_path, 'policy_best.pth')
-            # elif args.eval_best_model:
-            #     model_path = os.path.join(defense_model_path, 'eval_best_model', 'policy_eval_best.pth')
-            # else:
-            #     model_path = os.path.join(defense_model_path, 'policy.pth')
-
+            model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
             print("DEBUG def model path: ", model_path)
-            # temp_def_env = gym.make(args.env_name, attack=False)
-            # trained_agent = SAC("MlpPolicy", temp_def_env, verbose=1, device=device)
-            # state_dict = th.load(model_path, map_location=device)
-            # trained_agent.policy.load_state_dict(state_dict)
             trained_agent = SAC.load(model_path, device=device)
-
         elif args.algo == "SAC":
-            model_path = os.path.join(args.path_def, args.algo, args.env_name, "lunar")
+            model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
             print("DEBUG def model path: ", model_path)
             trained_agent = SAC.load(model_path, device=device)
+        elif args.algo == "PPO":
+            model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+            print("DEBUG def model path: ", model_path)
+            trained_agent = PPO.load(model_path, device=device)
+        elif args.algo == "TD3":
+            model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+            print("DEBUG def model path: ", model_path)
+            trained_agent = TD3.load(model_path, device=device)
 
-        model_adv = create_model_adv(args, env_adv, device, best_model_path_adv, model_path)
+        adv_log_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv")
+        os.makedirs(adv_log_path, exist_ok=True)
+        best_model_path_adv = os.path.join(adv_log_path, "best_model")
+        model_path_adv = os.path.join(adv_log_path, "model")
+        os.makedirs(model_path_adv, exist_ok=True)
+        checkpoint_callback_adv = CheckpointCallback(save_freq=args.save_freq, save_path=model_path_adv)
+
+        model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
 
         model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
-                        callback=[checkpoint_callback_adv] + callbacks_common, log_interval=args.print_interval)
+                        callback=[checkpoint_callback_adv] + callbacks_common, log_interval=args.print_interval,
+                        age_model_path = model_path)
+        model_adv.save(os.path.join(adv_log_path, "lunar"), exclude=["optimizer", "replay_buffer", "trained_agent"])
 
         mean_success = final_evaluation(args, trained_agent, model_adv, device, attack=False, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
         final_mean_success = final_evaluation(args, trained_agent, model_adv, device, attack=True, is_swanlab=args.swanlab, eval_episode=args.eval_episode)
 
-        # eval_env_def.close()
-        # eval_env_adv.close()
-        adv_path = os.path.join(args.path_adv, args.algo_adv, args.env_name, args.algo, args.model_name)
-
-        os.makedirs(adv_path, exist_ok=True)
-        model_adv.save(os.path.join(adv_path, "lunar"), exclude=["optimizer", "replay_buffer", "trained_agent"])
-        # th.save(model_adv.policy.state_dict(), os.path.join(adv_path, "policy.pth"))
         del model_adv
         env_adv.close()
         env_def.close()
-        # if args.algo == "RARL":
-        #     temp_def_env.close()
+
     else:
         # 2025-10-02 wq 防御者预训练 (Standard SAC)
         env_def = DummyVecEnv([make_env(args.seed, 0, False)])
@@ -383,10 +507,9 @@ def run_training(args):
             callback=[checkpoint_callback_def] + callbacks_common
         )
 
-        base_def_path = os.path.join(eval_def_log_path, "0", "lunar")
-        model_def_pre.save(base_def_path, exclude=["trained_agent", "trained_adv"])
+        base_def_path = os.path.join(log_path, "0", "def", "lunar")
 
-        del model_def_pre
+        model_def_pre.save(base_def_path, exclude=["trained_agent", "trained_adv"])
 
         # 2025-11-11 wq 攻击者预训练
         model_adv = create_model_adv(args, env_adv, device, best_model_path_adv)
@@ -394,10 +517,16 @@ def run_training(args):
                         callback=[checkpoint_callback_adv] + callbacks_common, reset_num_timesteps=False,
                         age_model_path=base_def_path)
 
-        model_adv.save(os.path.join(eval_adv_log_path, "0", "lunar"), exclude=["trained_agent"])
+        model_adv.save(os.path.join(log_path, "0", "adv", "lunar"), exclude=["trained_agent"])
 
+        mean_success_noAttack, _ = final_evaluation(args, model_def_pre, model_adv, device, attack=False,
+                                                    is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+        mean_success_attack, attack_success = final_evaluation(args, model_def_pre, model_adv, device, attack=True,
+                                                               is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+        del model_def_pre
+        expert_path = os.path.join("logs", args.env_name, args.algo, "expert", "lunar")
 
-        model_def = create_model_def(args, env_def, device, best_model_path_def)
+        model_def = create_model_def(args, env_def, device, best_model_path_def, expert_path)
 
         for i in range(args.loop_nums):
             env_def.reset()
@@ -405,33 +534,30 @@ def run_training(args):
             print(f"\n{'=' * 15} Loop {i + 1}/{args.loop_nums} {'=' * 15}")
             # 2025-11-11 wq 防御者训练
 
-            base_adv_path = os.path.join(eval_adv_log_path, str(i), "lunar")
-            base_def_path = os.path.join(eval_def_log_path, str(i), "lunar")
-
-            # old_model = SAC.load(base_def_path)
-            # model_def.policy.load_state_dict(old_model.policy.state_dict())
+            base_adv_path = os.path.join(log_path, str(i), "adv", "lunar")
+            base_def_path = os.path.join(log_path, str(i), "def", "lunar")
 
             model_def.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                             callback=[checkpoint_callback_def] + callbacks_common, reset_num_timesteps=False,
                             trained_age_path = base_def_path, adv_path = base_adv_path)
 
-            def_path = os.path.join(eval_def_log_path, str(i + 1), "lunar")
-            model_def.save(def_path, exclude=["trained_agent", "trained_adv"])
-            # del old_model
+            def_path = os.path.join(log_path, str(i + 1), "def", "lunar")
+            model_def.save(def_path, exclude=["trained_agent", "trained_adv", "trained_expert"])
+
             # 2025-11-11 wq 攻击者训练
-            # adv_old_model = PPO.load(base_adv_path)
-            # model_adv.policy.load_state_dict(adv_old_model.policy.state_dict())
+
             model_adv.learn(total_timesteps=args.train_step * args.n_steps, progress_bar=True,
                             callback=[checkpoint_callback_adv] + callbacks_common, reset_num_timesteps=False,
                             age_model_path = def_path)
-            model_adv.save(os.path.join(eval_adv_log_path, str(i + 1), "lunar"),
-                           exclude=["trained_agent"])
-            # del adv_old_model
+            adv_path = os.path.join(log_path, str(i + 1), "adv", "lunar")
+            model_adv.save(adv_path, exclude=["trained_agent"])
 
-            mean_success_noAttack = final_evaluation(args, model_def, model_adv, device, attack=False,
+
+            mean_success_noAttack, _ = final_evaluation(args, model_def, model_adv, device, attack=False,
                                                      is_swanlab=args.swanlab, eval_episode=args.eval_episode)
-            mean_success_attack = final_evaluation(args, model_def, model_adv, device, attack=True,
+            mean_success_attack, attack_success = final_evaluation(args, model_def, model_adv, device, attack=True,
                                                    is_swanlab=args.swanlab, eval_episode=args.eval_episode)
+
 
         # return mean_success_attack
 

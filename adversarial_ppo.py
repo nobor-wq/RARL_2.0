@@ -1,6 +1,6 @@
 from on_policy_algorithm import OnPolicyAdversarialAlgorithm
 from stable_baselines3.common.utils import explained_variance
-from stable_baselines3 import PPO, SAC
+from stable_baselines3 import PPO, SAC, TD3
 import torch as th
 import numpy as np
 from gymnasium import spaces
@@ -89,21 +89,15 @@ class AdversarialDecouplePPO(AdversarialPPO):
               tb_log_name='PPO', reset_num_timesteps=True, progress_bar=False, age_model_path=None,  *args, **kwargs):
 
         if self.algo == "RARL":
-            # eval_rarl = gym.make(custom_args.env_name, attack=False)
-            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
-            # state_dict = th.load(age_model_path, map_location=self.device)
-            #
-            # self.trained_agent.policy.load_state_dict(state_dict)
-            # eval_rarl.close()
             self.trained_agent = SAC.load(age_model_path, device=self.device)
         elif self.algo == "SAC":
-            # eval_rarl = gym.make(custom_args.env_name, attack=False)
-            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
-            # state_dict = th.load(age_model_path, map_location=self.device)
-            #
-            # self.trained_agent.policy.load_state_dict(state_dict)
-            # eval_rarl.close()
             self.trained_agent = SAC.load(age_model_path, device=self.device)
+        elif self.algo == "PPO":
+            self.trained_agent = PPO.load(age_model_path, device=self.device)
+        elif self.algo == "TD3":
+            self.trained_agent = TD3.load(age_model_path, device=self.device)
+        elif self.algo == "DARRL" or self.algo == "ICGARL" or self.algo == "SAC_lag":
+            self.trained_agent = age_model_path
 
 
         return super().learn(

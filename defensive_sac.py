@@ -8,7 +8,7 @@ import torch.optim as optim
 import gymnasium as gym
 
 class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
-    def __init__(self, custom_args, best_model_path, *args, **kwargs):
+    def __init__(self, custom_args, best_model_path, expert_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.best_model = custom_args.best_model
         self.algo = custom_args.algo
@@ -22,7 +22,7 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
         self.trained_agent = None
-        self.trained_expert = None
+        self.trained_expert = SAC.load(expert_path, device=self.device)
         self.trained_adv = None
 
 
@@ -44,16 +44,6 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
             else:
                 self.action_diff_coef = custom_args.action_diff_coef if hasattr(custom_args, 'action_diff_coef') else 5.0
 
-        # 2025-09-23 wq 加载敌手和防御者
-        # if self.best_model:
-        #     model_path_adv = os.path.join(self.path_adv, self.algo_adv, self.env_name, 'best_model/best_model')
-        #     model_path_age = os.path.join(self.path_def, self.algo, self.env_name, 'best_model/best_model')
-        # else:
-        #     model_path_adv = os.path.join(self.path_adv, self.algo_adv, self.env_name, 'lunar')
-        #     model_path_age = os.path.join(self.path_def, self.algo, self.env_name, 'lunar')
-        # self.trained_adv = PPO.load(model_path_adv, device=self.device)
-        # self.trained_agent = SAC.load(model_path_age, device=self.device)
-
         self.fni_flag = True if self.algo in ('FNI', 'DARRL') else False
         self.max_epi_reward = 0
         self.best_model_path = best_model_path
@@ -74,20 +64,9 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
 
         if self.algo == "RARL":
             self.trained_agent = SAC.load(trained_age_path, device=self.device)
-
-            # eval_rarl = gym.make(custom_args.env_name, attack=False)
-            # self.trained_agent = SAC("MlpPolicy", eval_rarl, verbose=1, device=self.device)
-            # state_dict = th.load(trained_age_path, map_location=self.device)
-            #
-            # self.trained_agent.policy.load_state_dict(state_dict)
-            # eval_rarl.close()
         if self.algo_adv == "PPO":
             self.trained_adv = PPO.load(adv_path, device=self.device)
-            # eval_ppo = gym.make(custom_args.env_name, attack=True)
-            # self.trained_adv = PPO("MlpPolicy", eval_ppo, verbose=1, device=self.device)
-            # state_dict = th.load(adv_path, map_location=self.device)
-            # self.trained_adv.policy.load_state_dict(state_dict)
-            # eval_ppo.close()
+
 
         return super().learn(
             total_timesteps=total_timesteps,
@@ -211,8 +190,8 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
                     # 步骤 1: 计算“安全”动作 (在干净状态 obs 下的动作)
                     with th.no_grad():
                         # 使用 action_log_prob 获取采样动作，与 actions_pi 保持一致
-                        # actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
-                        actions_clean_np, _ = self.predict(obs.cpu(), deterministic=True)
+                        actions_clean_np, _states = target_agent.predict(obs.cpu(), deterministic=True)
+                        # actions_clean_np, _ = self.predict(obs.cpu(), deterministic=True)
                         actions_clean = th.as_tensor(actions_clean_np, device=actions_pi.device, dtype=actions_pi.dtype)
                     # 步骤 2: 计算逐样本的均方误差损失 (约束的基础)
                     # actions_pi 是在扰动状态 obs_used 下的动作

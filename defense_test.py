@@ -9,6 +9,79 @@ import torch as th
 from fgsm import FGSM_v2
 from policy import  IGCARLNet
 
+import glob
+from SAC_lag.SAC_Agent_Continuous import SAC_Lag
+
+# --- [新增 2] 复制 train.py 中的 Wrapper 类 ---
+class SACLagPolicyAdapter(th.nn.Module):
+    """让自定义 SAC_Lag 策略在 FGSM、predict 接口下表现得像 SB3 模型。"""
+    def __init__(self, agent: SAC_Lag):
+        super().__init__()
+        self.agent = agent
+
+    def _prepare_obs(self, obs_tensor):
+        if not isinstance(obs_tensor, th.Tensor):
+            obs_tensor = th.as_tensor(obs_tensor, dtype=th.float32, device=self.agent.device)
+        else:
+            obs_tensor = obs_tensor.to(self.agent.device)
+        if obs_tensor.dim() == 1:
+            obs_tensor = obs_tensor.unsqueeze(0)
+        return obs_tensor
+
+    def forward(self, obs_tensor, deterministic=True):
+        obs_tensor = self._prepare_obs(obs_tensor)
+        if deterministic:
+            mean, _ = self.agent.policy.forward(obs_tensor)
+            action = th.tanh(mean)
+        else:
+            action, _, _ = self.agent.policy.sample(obs_tensor)
+        return action, None
+
+class SACLagSB3Wrapper:
+    """
+    让 SAC_Lag 看起来像 SB3 模型，提供 predict/device/policy 等属性，
+    便于现有对抗训练和 FGSM 攻击逻辑复用。
+    """
+    def __init__(self, agent: SAC_Lag):
+        self.agent = agent
+        self.device = agent.device
+        self.policy = SACLagPolicyAdapter(agent)
+
+    def predict(self, observation, deterministic=True):
+        obs_tensor = th.as_tensor(observation, dtype=th.float32, device=self.device)
+        if obs_tensor.dim() == 1:
+            obs_tensor = obs_tensor.unsqueeze(0)
+        action, _ = self.policy(obs_tensor, deterministic=deterministic)
+        action_np = action.squeeze(0).detach().cpu().numpy()
+        return action_np, None
+
+def _resolve_sac_lag_checkpoint(args, addition_msg):
+    """
+    根据 env/algo/seed(/addition_msg) 自动寻找最新的 sac_lag checkpoint。
+    注意：这里稍微修改了入参，直接传入 addition_msg 变量
+    """
+    base_dir = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed))
+    search_dirs = []
+    # defense_test.py 中 addition_msg 是局部变量，可能不为空
+    if addition_msg and addition_msg != "base":
+        search_dirs.append(os.path.join(base_dir, addition_msg))
+    search_dirs.append(base_dir)
+
+    candidates = []
+    for directory in search_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for pattern in ("sac_lag_*.pt", "sac_lag_*.pth"):
+            candidates.extend(glob.glob(os.path.join(directory, pattern)))
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"未在以下目录找到 sac_lag_*.pt/pth: {search_dirs}"
+        )
+
+    candidates.sort(key=os.path.getmtime, reverse=True)
+    return candidates[0]
+
 
 # get parameters from config.py
 parser = get_config()
@@ -45,7 +118,7 @@ if args.action_diff:
     # 依赖于 expert 的技术，可以进行嵌套
     if args.use_kl:
         msg_parts.append("kl")
-    elif args.use_lagrangian:
+    elif args.use_lag:
         msg_parts.append("lag")
 # 新增的 Buffer 技术
 if args.use_DualBuffer:
@@ -67,11 +140,10 @@ if args.attack:
     else:#str(args.train_eps)
         adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy.pth')
     # 加载训练好的攻击者模型
-    print("DEBUG adv model path: ", adv_model_path)
-
-    model = PPO("MlpPolicy", env, verbose=1, device=device)
-    state_dict = th.load(adv_model_path, map_location=device)
-    model.policy.load_state_dict(state_dict)
+    # adv_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, args.model_name, 'policy.pth')
+    adv_path =  os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv", "lunar")
+    print("DEBUG adv model path: ", adv_path)
+    model = PPO.load(adv_path, device=device)
 
 
 # 加载训练好的自动驾驶模型
@@ -86,31 +158,42 @@ if args.algo == "IGCARL":
     trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
     trained_agent.eval()
 elif args.algo == "RARL":
+    defense_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    print("DEBUG def model path: ", defense_model_path)
+    trained_agent  = SAC.load(defense_model_path, device=device)
+elif args.algo == "SAC":
+    sac_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    print("DEBUG defense_test.py sac_model_path: ", sac_model_path)
+    trained_agent = SAC.load(sac_model_path, device=device)
+elif args.algo == "PPO":
+    ppo_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    print("DEBUG defense_test.py ppo_model_path: ", ppo_model_path)
+    trained_agent = PPO.load(ppo_model_path, device=device)
+elif args.algo == "TD3":
+    td3_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    print("DEBUG defense_test.py td3_model_path: ", td3_model_path)
+    trained_agent = TD3.load(td3_model_path, device=device)
+elif args.algo == 'DARRL':
+    trained_agent = IGCARLNet(26, 1)
+    score = f"policy2000_actor"
+    model_path_drl = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), score) + '.pth'
+    state_dict = th.load(model_path_drl, map_location=device)
+    trained_agent.load_state_dict(state_dict)
+    trained_agent.eval()
+    trained_agent.to(device)  # 再次确保
+# --- [新增 3] 添加 SAC_lag 加载分支 ---
+elif args.algo == "SAC_lag":
+    # 使用之前定义的 helper 函数查找模型路径
+    # ckpt_path = _resolve_sac_lag_checkpoint(args, addition_msg)
+    base_dir = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "sac_lag_2000.pt")
+    print("DEBUG def model path: ", base_dir)
 
-    defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps),
-                                                           str(args.seed), str(args.trained_step))
-    if args.best_model:
-        model_path = os.path.join(defense_model_path, 'best_model', 'policy_best.pth')
-    elif args.eval_best_model:
-        model_path = os.path.join(defense_model_path, 'eval_best_model', 'policy_eval_best.pth')
-    else:
-        model_path = os.path.join(defense_model_path, 'policy.pth')
+    # 初始化 Agent 并加载权重
+    lag_agent = SAC_Lag(state_dim=args.state_dim, action_dim=args.action_dim, device=device)
+    lag_agent.load_actor(base_dir)
 
-    print("DEBUG def model path: ", model_path)
-    trained_agent = SAC("MlpPolicy", temp_def_env, verbose=1, device=device)
-    state_dict = th.load(model_path, map_location=device)
-    trained_agent.policy.load_state_dict(state_dict)
-
-    # defense_model_path = "./logs/eval_def/" + os.path.join(args.algo, args.env_name, addition_msg, str(args.train_eps), str(args.seed), str(args.trained_step))
-    #
-    # if args.best_model:
-    #     model_path = os.path.join(defense_model_path, 'best_model')
-    # elif args.eval_best_model:
-    #     model_path = os.path.join(defense_model_path, 'eval_best_model', 'best_model')
-    # else:
-    #     model_path = os.path.join(defense_model_path, 'lunar')
-    # print("DEBUG def model path: ", model_path)
-    # trained_agent = SAC.load(model_path, device=device)
+    # 使用 Wrapper 包装，使其具备 .predict 方法
+    trained_agent = SACLagSB3Wrapper(lag_agent)
 
 # 进行验证
 rewards = []
@@ -148,6 +231,8 @@ for episode in range(args.train_step):
             adv_actions, _ = model.predict(obs_tensor.cpu(), deterministic=True)
 
             adv_action_mask = (adv_actions[0] > 0) & (obs[-2] > 0)
+            if args.unlimited_attack:
+                adv_action_mask = np.ones_like(adv_action_mask, dtype=bool)
             #print(adv_action_MAD,actions)
             if adv_action_mask or args.unlimited_attack:
                 if args.attack_method == 'fgsm':
@@ -191,8 +276,6 @@ for episode in range(args.train_step):
             c_def = float(info0['cost'])
             episode_reward += r_def - c_def
             print('step ', episode_steps, 'reward is ', r_def-c_def)
-
-
         else:
             speed_list.append(obs[-2])
             #actions = trained_agent.policy(obs_tensor.unsqueeze(0))
@@ -204,7 +287,7 @@ for episode in range(args.train_step):
                 actions,_ = trained_agent.predict(obs, deterministic=True)
             obs, reward, done, terminate, info = env.step(actions)
             episode_reward += reward
-            print('step ', episode_steps, 'reward is ', reward)
+            print('No attack step ', episode_steps, 'reward is ', reward)
 
         episode_steps += 1
 
@@ -270,10 +353,15 @@ print(f"Success rate: {sr:.2f}")
 
 if args.attack:
     # 计算平均攻击次数
-    mean_attack_times = np.mean(attack_count_list)
-    std_attack_times = np.std(attack_count_list)
-    # 2025-10-30 wq 计算攻击后成功碰撞的概率
-    asr = success_attack_count / sum(attack_count_list) * 100
+    if attack_count_list == 0:
+        mean_attack_times = 0
+        std_attack_times = 0
+        asr = 0
+    else:
+        mean_attack_times = np.mean(attack_count_list)
+        std_attack_times = np.std(attack_count_list)
+        # 2025-10-30 wq 计算攻击后成功碰撞的概率
+        asr = success_attack_count / sum(attack_count_list) * 100
     ep_asr = success_attack_count / args.train_step * 100
 
     print('attack lists ', attack_count_list, 'attack times ', len(attack_count_list))

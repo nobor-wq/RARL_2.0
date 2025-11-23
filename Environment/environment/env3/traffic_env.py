@@ -183,13 +183,22 @@ class Traffic_Env(gym.Env):
 
         # efficiency
         reward = v_ego / self.maxSpeed
+        if not self.attack:
+            speed_cost = 0.0
+            if v_ego < 8.0:
+                speed_cost = 0.1
+
 
         # safety
         collision_value = self.check_collision(dis_f, dis_r, dis_sides, vehicle_params)
         if collision_value is True:
             cost = 1.0
 
-        return reward - cost, collision_value, reward, cost
+        if self.attack:
+            return reward - cost , collision_value, reward, cost
+        else:
+            return reward - cost - speed_cost , collision_value, reward, cost
+
 
     def check_collision(self, dis_f, dis_r, dis_sides, vehicle_params):
         collision_value = False
