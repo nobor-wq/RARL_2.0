@@ -22,8 +22,12 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self.decouple = custom_args.decouple
         self.attack_eps = custom_args.attack_eps
         self.trained_agent = None
-        self.trained_expert = SAC.load(expert_path, device=self.device)
+        # self.trained_expert = SAC.load(expert_path, device=self.device)
+        self.trained_expert = None
         self.trained_adv = None
+        self.use_expert = False
+        self.use_kl = False
+        self.use_lag = False
 
 
         self.action_diff = custom_args.action_diff if hasattr(custom_args, 'action_diff') else False
@@ -282,9 +286,10 @@ class DefensiveSAC(OffPolicyDefensiveAlgorithm, SAC):
         self._n_updates += gradient_steps
 
         self.logger.record("train_def/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train_def/ent_coef", np.mean(ent_coefs))
         self.logger.record("train_def/actor_loss", np.mean(actor_losses))
         self.logger.record("train_def/critic_loss", np.mean(critic_losses))
+        if len(ent_coefs) > 0:
+            self.logger.record("train_def/ent_coef", np.mean(ent_coefs))
         if len(ent_coef_losses) > 0:
             self.logger.record("train_def/ent_coef_loss", np.mean(ent_coef_losses))
 

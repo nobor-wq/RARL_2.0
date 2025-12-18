@@ -183,10 +183,6 @@ class Traffic_Env(gym.Env):
 
         # efficiency
         reward = v_ego / self.maxSpeed
-        if not self.attack:
-            speed_cost = 0.0
-            if v_ego < 8.0:
-                speed_cost = 0.1
 
 
         # safety
@@ -194,10 +190,8 @@ class Traffic_Env(gym.Env):
         if collision_value is True:
             cost = 1.0
 
-        if self.attack:
-            return reward - cost , collision_value, reward, cost
-        else:
-            return reward - cost - speed_cost , collision_value, reward, cost
+
+        return reward - cost , collision_value, reward, cost
 
 
     def check_collision(self, dis_f, dis_r, dis_sides, vehicle_params):
@@ -234,7 +228,7 @@ class Traffic_Env(gym.Env):
         # if action_arr.size >= 2:
         #     flag = True  # 2025-10-06 wq 用来判断返回的动作长度
 
-        if self.attack and not self.darrl:
+        if self.attack:
             action, self.adv_action_mask = action_arr[0].item(), action_arr[1].item()
             if self.adv_action_mask:
                 self.attack_remain -= 1
@@ -393,6 +387,3 @@ class Traffic_Env(gym.Env):
             traci.close()
         except traci.exceptions.FatalTraCIError as e:
             print(f"TraCI Error: {e}")
-
-
-

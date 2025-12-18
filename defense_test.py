@@ -7,8 +7,7 @@ import Environment.environment
 import os
 import torch as th
 from fgsm import FGSM_v2
-from policy import  IGCARLNet
-
+from policy import  IGCARLNet, FniNet
 import glob
 from SAC_lag.SAC_Agent_Continuous import SAC_Lag
 
@@ -129,19 +128,12 @@ if not msg_parts:
 else:
     addition_msg = "_".join(msg_parts)
 
-
+env_name = "TrafficEnv3-v0"
 
 if args.attack:
-    if args.best_model:
-        if args.eval_best_model:
-            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'eval_best_model/policy_eval_best.pth')
-        else:
-            adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'best_model/policy_best.pth')
-    else:#str(args.train_eps)
-        adv_model_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, addition_msg, str(args.train_eps) , str(args.seed),  str(args.trained_step), 'policy.pth')
     # 加载训练好的攻击者模型
     # adv_path = "./logs/eval_adv/" + os.path.join(args.algo_adv, args.env_name, args.algo, args.model_name, 'policy.pth')
-    adv_path =  os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv", "lunar")
+    adv_path =  os.path.join("logs", env_name, args.algo, str(args.trained_seed), "adv", "lunar")
     print("DEBUG adv model path: ", adv_path)
     model = PPO.load(adv_path, device=device)
 
@@ -149,43 +141,59 @@ if args.attack:
 # 加载训练好的自动驾驶模型
 
 if args.algo == "IGCARL":
-    prefix = "./logs/eval_def/" + os.path.join(args.algo, args.env_name)
-    filename = f'{args.model_name}.pth'
-    model_path_drl = os.path.join(prefix, filename)
+    model_path_drl = os.path.join("logs", env_name, args.algo, "defender_v265.pth")
     if not os.path.isfile(model_path_drl):
         raise FileNotFoundError(f"找不到模型文件：{model_path_drl}")
     trained_agent = IGCARLNet(state_dim=26, action_dim=1).to(device)
     trained_agent.load_state_dict(th.load(model_path_drl, map_location=device))
     trained_agent.eval()
 elif args.algo == "RARL":
-    defense_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    defense_model_path = os.path.join("logs", env_name, args.algo, str(args.trained_seed), "lunar")
     print("DEBUG def model path: ", defense_model_path)
     trained_agent  = SAC.load(defense_model_path, device=device)
 elif args.algo == "SAC":
-    sac_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    sac_model_path = os.path.join("logs", env_name, args.algo, str(args.trained_seed), "lunar")
     print("DEBUG defense_test.py sac_model_path: ", sac_model_path)
     trained_agent = SAC.load(sac_model_path, device=device)
 elif args.algo == "PPO":
-    ppo_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    ppo_model_path = os.path.join("logs", env_name, args.algo, str(args.trained_seed), "lunar")
     print("DEBUG defense_test.py ppo_model_path: ", ppo_model_path)
     trained_agent = PPO.load(ppo_model_path, device=device)
 elif args.algo == "TD3":
-    td3_model_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "lunar")
+    td3_model_path = os.path.join("logs", env_name, args.algo, str(args.trained_seed), "lunar")
     print("DEBUG defense_test.py td3_model_path: ", td3_model_path)
     trained_agent = TD3.load(td3_model_path, device=device)
 elif args.algo == 'DARRL':
     trained_agent = IGCARLNet(26, 1)
     score = f"policy2000_actor"
-    model_path_drl = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), score) + '.pth'
+    model_path_drl = os.path.join("logs", env_name, args.algo, str(args.trained_seed), score) + '.pth'
     state_dict = th.load(model_path_drl, map_location=device)
     trained_agent.load_state_dict(state_dict)
     trained_agent.eval()
     trained_agent.to(device)  # 再次确保
+elif args.algo == 'FNI':
+    model_path = FniNet(args.state_dim, args.action_dim).to(device)
+    if args.fni_model_path:
+        ckpt_path = args.fni_model_path
+        if not ckpt_path.endswith(".pth"):
+            ckpt_path = f"{ckpt_path}.pth"
+        if not os.path.isabs(ckpt_path):
+            ckpt_path = os.path.join("logs", env_name, args.algo, ckpt_path)
+    else:
+        ckpt_path = os.path.join("logs", env_name, args.algo, "policy_v411.pth")
+    ckpt_path = os.path.expanduser(ckpt_path)
+    if not os.path.isfile(ckpt_path):
+        raise FileNotFoundError(f"找不到模型文件：{ckpt_path}")
+    state_dict = th.load(ckpt_path, map_location=device)
+    model_path.load_state_dict(state_dict)
+    model_path.eval()
+    model_path.to(device)  # 再次确保
+    trained_agent = model_path
 # --- [新增 3] 添加 SAC_lag 加载分支 ---
 elif args.algo == "SAC_lag":
     # 使用之前定义的 helper 函数查找模型路径
     # ckpt_path = _resolve_sac_lag_checkpoint(args, addition_msg)
-    base_dir = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "sac_lag_2000.pt")
+    base_dir = os.path.join("logs", env_name, args.algo, str(args.trained_seed), "sac_lag_2000.pt")
     print("DEBUG def model path: ", base_dir)
 
     # 初始化 Agent 并加载权重
@@ -310,7 +318,7 @@ for episode in range(args.train_step):
     if args.attack:
         if args.unlimited_attack:
             attack_count_list.append(episode_steps)
-    if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv6-v0':
+    if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv3-v1' or args.env_name == 'TrafficEnv3-v2':
         if xa < -50.0 and ya > 4.0 and done is False:
             sn += 1
     elif args.env_name == 'TrafficEnv2-v0':
@@ -353,7 +361,8 @@ print(f"Success rate: {sr:.2f}")
 
 if args.attack:
     # 计算平均攻击次数
-    if attack_count_list == 0:
+    total_attacks = sum(attack_count_list)
+    if total_attacks == 0:
         mean_attack_times = 0
         std_attack_times = 0
         asr = 0
@@ -371,7 +380,7 @@ if args.attack:
 
 
 # 定义日志文件路径
-log_file = "eval_attack_log_207.txt"
+log_file = "eval_attack_log_101.txt"
 
 # 将参数和结果写入日志文件
 with open(log_file, 'a') as f:  # 使用 'a' 模式以追加方式写入文件

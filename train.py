@@ -17,7 +17,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import os
 import glob
 from swanlab.integration.sb3 import SwanLabCallback
-from policy import IGCARLNet
+from policy import IGCARLNet, FniNet
 from stable_baselines3.common.utils import obs_as_tensor
 from fgsm import FGSM_v2
 from SAC_lag.SAC_Agent_Continuous import SAC_Lag
@@ -116,6 +116,23 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                    render_mode=args.render_mode)
     eval_env.unwrapped.start()
 
+    def _is_custom_policy(agent):
+        return isinstance(agent, (IGCARLNet, FniNet))
+
+    def _defender_action(agent, obs_tensor):
+        """
+        返回 torch.Tensor 形式的动作，方便后续统一处理。
+        obs_tensor 必须是 torch.Tensor（单步观测或去掉攻击信息后的观测）。
+        """
+        if _is_custom_policy(agent):
+            mu, _, _ = agent(obs_tensor)
+            if isinstance(mu, th.Tensor):
+                return mu
+            return th.as_tensor(mu, dtype=th.float32, device=obs_tensor.device)
+        obs_np = obs_tensor.detach().cpu().numpy()
+        action_np, _ = agent.predict(obs_np, deterministic=True)
+        return th.as_tensor(action_np, dtype=th.float32, device=obs_tensor.device)
+
     # 3. 循环评估
     rewards = []
     num_eval_episodes = eval_episode
@@ -134,12 +151,11 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
 
             if attack:
                 # 防御者生成原始动作
+                base_obs = obs_tensor[:-2]
                 with th.no_grad():
-                    if isinstance(final_defender, IGCARLNet):
-                        actions, std, _action = final_defender(obs_tensor[:-2])
-                    else:
-                        actions, _ = final_defender.predict(obs_tensor[:-2].cpu(), deterministic=True)
-                actions_tensor = th.tensor(actions, device=obs_tensor.device)  # 确保在同一设备上
+                    base_action_tensor = _defender_action(final_defender, base_obs)
+                actions = base_action_tensor.detach().cpu().numpy()
+                actions_tensor = th.as_tensor(actions, device=obs_tensor.device)
                 obs_tensor[-1] = actions_tensor
                 # 攻击者生成攻击动作
                 with th.no_grad():
@@ -153,11 +169,8 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                 if adv_action_mask.any():
                     adv_state = FGSM_v2(adv_actions[1], victim_agent=final_defender,
                                         last_state=obs_tensor[:-2].unsqueeze(0), epsilon=args.attack_eps, device=device)
-                    if isinstance(final_defender, IGCARLNet):
-                        action_perturbed, std, _action = final_defender(adv_state)
-                    else:
-                        action_perturbed, _ = final_defender.predict(adv_state.cpu(), deterministic=True)
-                    final_action = action_perturbed
+                    perturbed_action_tensor = _defender_action(final_defender, adv_state)
+                    final_action = perturbed_action_tensor.detach().cpu().numpy()
                     total_attack_times += 1
                     if is_swanlab:
                         swanlab.log({"Eval/agent action before:": actions.item()})
@@ -199,11 +212,8 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
                 episode_reward += r_def - c_def
             else:
                 with th.no_grad():
-                    if isinstance(final_defender, IGCARLNet):
-                        actions, std, _action = final_defender(obs_tensor)
-                    else:
-                        actions, _ = final_defender.predict(obs_tensor.cpu(), deterministic=True)
-                obs, reward, done, terminate, info = eval_env.step(actions)
+                    eval_action_tensor = _defender_action(final_defender, obs_tensor)
+                obs, reward, done, terminate, info = eval_env.step(eval_action_tensor.detach().cpu().numpy())
                 episode_reward += reward
             if done:
                 break
@@ -213,6 +223,9 @@ def final_evaluation(args, final_defender, final_attacker, device, attack, is_sw
 
         if args.env_name == 'TrafficEnv1-v0' or args.env_name == 'TrafficEnv3-v0' or args.env_name == 'TrafficEnv6-v0':
             if xa < -50.0 and ya > 4.0 and done is False:
+                sn += 1
+        elif args.env_name == 'TrafficEnv8-v0':
+            if ya == 10.0 and done is False:
                 sn += 1
         rewards.append(episode_reward)
     eval_env.close()
@@ -320,6 +333,9 @@ def run_training(args):
         'expert': 'use_expert',
         'lag': 'use_lag',
         'DualBuffer': 'use_DualBuffer',
+        'unlimitedAttack': 'unlimited_attack',
+        'rarl':  'rarl',
+        'seed8': 'seed8',
 
         # --- 带值的参数 (会显示为 '名字-值' 的格式) ---
         'eps': 'attack_eps',
@@ -432,19 +448,38 @@ def run_training(args):
     if args.adv_test:
         # 2025-10-16 wq 测试
         if args.algo == "IGCARL":
-            prefix = "./logs/eval_def/" + os.path.join(args.algo, args.env_name)
-            filename = f'{args.model_name}.pth'
-            model_path_drl = os.path.join(prefix, filename)
+            model_path_drl = os.path.join("logs", args.env_name, args.algo, "defender_v265.pth")
             if not os.path.isfile(model_path_drl):
                 raise FileNotFoundError(f"找不到模型文件：{model_path_drl}")
             model_def = IGCARLNet(state_dim=26, action_dim=1).to(device)
             model_def.load_state_dict(th.load(model_path_drl, map_location=device))
             model_def.eval()
+            trained_agent = model_def
+            model_path = model_def
         elif args.algo == 'DARRL':
-            model_path = IGCARLNet(26, 1)
+            model_path = IGCARLNet(args.state_dim, args.action_dim)
             score = f"policy2000_actor"
             model_path_drl = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), score) + '.pth'
             state_dict = th.load(model_path_drl, map_location=device)
+            model_path.load_state_dict(state_dict)
+            model_path.eval()
+            model_path.to(device)  # 再次确保
+            trained_agent = model_path
+        elif args.algo == 'FNI':
+            model_path = FniNet(args.state_dim, args.action_dim).to(device)
+            if args.fni_model_path:
+                ckpt_path = args.fni_model_path
+                if not ckpt_path.endswith(".pth"):
+                    ckpt_path = f"{ckpt_path}.pth"
+                if not os.path.isabs(ckpt_path):
+                    ckpt_path = os.path.join("logs", args.env_name, args.algo, ckpt_path)
+            else:
+                ckpt_path = os.path.join("logs", args.env_name, args.algo, "policy_v411.pth")
+                
+            ckpt_path = os.path.expanduser(ckpt_path)
+            if not os.path.isfile(ckpt_path):
+                raise FileNotFoundError(f"找不到模型文件：{ckpt_path}")
+            state_dict = th.load(ckpt_path, map_location=device)
             model_path.load_state_dict(state_dict)
             model_path.eval()
             model_path.to(device)  # 再次确保
@@ -473,7 +508,11 @@ def run_training(args):
             print("DEBUG def model path: ", model_path)
             trained_agent = TD3.load(model_path, device=device)
 
-        adv_log_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv")
+
+        if args.unlimited_attack:
+            adv_log_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv-ul")
+        else:
+            adv_log_path = os.path.join("logs", args.env_name, args.algo, str(args.trained_seed), "adv")
         os.makedirs(adv_log_path, exist_ok=True)
         best_model_path_adv = os.path.join(adv_log_path, "best_model")
         model_path_adv = os.path.join(adv_log_path, "model")

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from policy import IGCARLNet
+from policy import IGCARLNet, FniNet
 
 
 def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
@@ -40,7 +40,7 @@ def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
     for i in range(num_iterations):
         last_state.requires_grad = True
 
-        if isinstance(victim_agent, IGCARLNet):
+        if isinstance(victim_agent, (IGCARLNet, FniNet)):
             outputs, _, _ = victim_agent(last_state)
             victim_agent.zero_grad()
         else:
@@ -51,7 +51,6 @@ def FGSM_v2(adv_action, victim_agent, last_state, epsilon=0.1,
             else:
                 outputs = outputs[0]
             victim_agent.policy.zero_grad()
-        # cost = -loss(outputs, adv_action).to(device)
         # 确保 adv_action 和 outputs 在同一个设备上，以 outputs 的设备为准
         adv_action_on_device = adv_action.to(outputs.device)
         # 现在两个张量都在同一个设备上，可以安全地计算损失了

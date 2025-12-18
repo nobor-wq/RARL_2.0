@@ -126,8 +126,13 @@ class OffPolicyDefensiveAlgorithm(OffPolicyAlgorithm):
                 obs_adv = th.cat([obs_tensor, attReStep_tensor, actions_tensor], dim=-1)  # -> (batch, 28)
                 adv_action, _ = self.trained_adv.predict(obs_adv.cpu(), deterministic=True)
 
-            adv_action_mask = (adv_action[:, 0] > 0) & (obs_adv[:, -2].cpu().numpy() > 0)
-            if adv_action_mask:
+            if self.unlimited_attack:
+                # Force attacks on all envs when unlimited_attack is enabled
+                adv_action_mask = np.ones(adv_action.shape[0], dtype=bool)
+            else:
+                adv_action_mask = (adv_action[:, 0] > 0) & (obs_adv[:, -2].cpu().numpy() > 0)
+
+            if adv_action_mask.any():
                 adv_action_eps = adv_action[:, 1]
                 state_eps = FGSM_v2(adv_action_eps, victim_agent=self.trained_agent, epsilon=self.attack_eps,
                                    last_state=last_obs_copy, device=self.device)

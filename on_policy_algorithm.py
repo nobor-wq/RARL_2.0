@@ -73,9 +73,13 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
 
             # Get adv action mask
             if self.unlimited_attack:
-                adv_action_mask = np.ones_like(clipped_adv_actions)
+                # adv_action_mask = np.ones_like(clipped_adv_actions)
+                adv_action_mask = np.ones(clipped_adv_actions.shape[0], dtype=bool)
+                # print("DEBUG on_policy.py adv_action_mask: ", adv_action_mask, "is shape: ",adv_action_mask.shape)
             else:
                 adv_action_mask = (clipped_adv_actions[:, 0] > 0) & (obs_tensor[:, -2].cpu().numpy() > 0)
+                # print("DEBUG on_policy.py adv_action_mask: ", adv_action_mask, "is shape: ",adv_action_mask.shape)
+
 
             # Generate perturbation into observations to get adv_obs
             final_actions = self.attack_process(obs_tensor, adv_action_mask, clipped_adv_actions, actions)
@@ -183,6 +187,7 @@ class OnPolicyAdversarialAlgorithm(OnPolicyAlgorithm):
 
             selected_states = obs_tensor[attack_idx, :-2]
             selected_adv_actions = clipped_adv_actions[attack_idx, 1]
+
             if self.attack_method == 'fgsm':
                 adv_state = FGSM_v2(selected_adv_actions, victim_agent=self.trained_agent,
                                     last_state=selected_states, epsilon=self.attack_eps, device=self.device)
